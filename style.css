@@ -18,7 +18,6 @@ body {
 
 .container {
    position: absolute;
-   top: var(--header-height);
    left: 0;
    display: flex;
    flex-direction: column;
@@ -26,13 +25,14 @@ body {
    align-items: center;
    height: auto;
    width: 100vw;
-   min-height: calc(100vh - var(--header-height));
+   min-height: 100vh;
    margin: 0;
 }
 
 .content {
+   top: var(--header-height);
    height: auto;
-   min-height: 100vh;
+   min-height: calc(100vh - var(--header-height));
    width: 70%;
 }
 
