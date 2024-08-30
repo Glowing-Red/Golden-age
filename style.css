@@ -1,0 +1,51 @@
+:root {
+   --header-height: 0
+}
+
+*, *::before, *::after {
+   padding: 0;
+   margin: 0;
+   box-sizing: border-box;
+}
+
+body {
+   overflow-x: hidden;
+   overflow-y: scroll;
+   font-size: .95em;
+   font-family: Inter, RedactRect, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
+   font-feature-settings: "case", "ss01", "ss04";
+}
+
+.container {
+   position: absolute;
+   top: var(--header-height);
+   left: 0;
+   display: flex;
+   flex-direction: column;
+   justify-content: start;
+   align-items: center;
+   height: auto;
+   width: 100vw;
+   min-height: calc(100vh - var(--header-height));
+   margin: 0;
+}
+
+.content {
+   height: auto;
+   min-height: 100vh;
+   width: 70%;
+}
+
+.flex-column {
+   display: flex;
+   flex-direction: column;
+   align-items: center;
+   justify-content: start;
+}
+
+.italic {
+   font-style: italic;
+}
+.bold {
+   font-weight: bold;
+}
