@@ -1,2 +1,0 @@
-console.log("HI", document.body.querySelector("header").getBoundingClientRect().height);
-document.documentElement.style.setProperty("--header-height", `${document.body.querySelector("header").getBoundingClientRect().height}px`);
