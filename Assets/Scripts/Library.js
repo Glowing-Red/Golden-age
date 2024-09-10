@@ -7,7 +7,11 @@ function IsTable(item) {
 }
 
 function isValidString(value) {
-   return (typeof value === 'string' && value.trim() !== '' && value !== null);
+   return (typeof value === 'string' && value.trim() !== '');
+}
+
+function isOverflow(element) {
+   return element.scrollWidth > element.clientWidth || element.scrollHeight > element.clientHeight;
 }
 
 function GetLength(table) {
@@ -66,4 +70,37 @@ function Instance(Instance, Properties, Parent) {
    }
    
    return element;
+}
+
+function WrapText(element) {
+   const originalFontSize = parseFloat(window.getComputedStyle(element).fontSize);
+   
+   function ResizeFontSize() {
+      let fontSize = parseFloat(window.getComputedStyle(element).fontSize);
+      
+      while (isOverflow(element) && fontSize > 1) {
+         fontSize--;
+         element.style.fontSize = fontSize + "px";
+      }
+      
+      while (!isOverflow(element) && fontSize < originalFontSize) {
+         fontSize++;
+         element.style.fontSize = fontSize + "px";
+         
+         if (isOverflow(element)) {
+            fontSize--;
+            element.style.fontSize = fontSize + "px";
+            
+            return;
+         }
+       }
+   }
+   
+   ResizeFontSize();
+   
+   const observer = new ResizeObserver(() => {
+      ResizeFontSize();
+   });
+   
+   observer.observe(element);
 }

@@ -1,0 +1,4 @@
+.Text-Wrap {
+   overflow: hidden;
+   white-space: nowrap;
+}
