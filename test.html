@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cookie Test</title>
+</head>
+
+<body>
+    <h1>Login</h1>
+    <form id="loginForm">
+        <input type="text" id="username" placeholder="Username" required>
+        <input type="password" id="password" placeholder="Password" required>
+        <button type="submit">Login</button>
+    </form>
+
+    <h1>Perform Action</h1>
+    <button id="addAccount">Add Account</button>
+
+    <script>
+        const API_URL = 'http://localhost:3000'; // Replace with your server URL
+
+        // Handle login form submission
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            try {
+                const response = await fetch(`${API_URL}/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ username, password }),
+                    credentials: 'include'
+                });
+
+                if (response.ok) {
+                    alert('Logged in successfully');
+                } else {
+                    alert('Invalid credentials');
+                }
+            } catch (error) {
+                console.error('Error during login:', error);
+            }
+        });
+
+        // Handle adding an account
+        document.getElementById('addAccount').addEventListener('click', async () => {
+            try {
+                const response = await fetch(`${API_URL}/add-account`, {
+                    method: 'POST',
+                    credentials: 'include' // Ensures cookies are sent with the request
+                });
+
+                if (response.ok) {
+                    const result = await response.text();
+                    alert(result);
+                } else {
+                    alert('Action failed: Not logged in');
+                }
+            } catch (error) {
+                console.error('Error adding account:', error);
+            }
+        });
+    </script>
+</body>
+
+</html>
