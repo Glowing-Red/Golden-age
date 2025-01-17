@@ -31,18 +31,18 @@ wss.on("connection", (ws) => {
             }
 
             currentRoom = message.roomId;
-            
+
             if (!clientsInRoom[currentRoom]) {
                 clientsInRoom[currentRoom] = [];
             }
             clientsInRoom[currentRoom].push(ws);
-            
+
             if (rooms[currentRoom]) {
                 rooms[currentRoom].forEach((msg) => {
                     ws.send(JSON.stringify(msg));
                 });
             }
-            
+
             ws.send(JSON.stringify({ type: "room", roomId: currentRoom }));
         } else if (message.type === "message" && currentRoom) {
             const newMessage = {
@@ -56,7 +56,6 @@ wss.on("connection", (ws) => {
             }
 
             rooms[currentRoom].push(newMessage);
-
             clientsInRoom[currentRoom].forEach((client) => {
                 if (client.readyState === WebSocket.OPEN) {
                     client.send(JSON.stringify(newMessage));
