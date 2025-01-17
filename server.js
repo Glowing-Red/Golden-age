@@ -19,10 +19,9 @@ wss.on("connection", (ws) => {
         const message = JSON.parse(data);
 
         if (message.type === "join") {
-            // First, make the user leave any current room
             if (currentRoom) {
-                // Remove the client from the previous room
                 const roomClients = clientsInRoom[currentRoom];
+
                 if (roomClients) {
                     const index = roomClients.indexOf(ws);
                     if (index !== -1) {
@@ -33,23 +32,19 @@ wss.on("connection", (ws) => {
 
             currentRoom = message.roomId;
             
-            // Add the client to the room
             if (!clientsInRoom[currentRoom]) {
                 clientsInRoom[currentRoom] = [];
             }
             clientsInRoom[currentRoom].push(ws);
-
-            // If the room exists, send all previous messages
+            
             if (rooms[currentRoom]) {
                 rooms[currentRoom].forEach((msg) => {
-                    ws.send(JSON.stringify(msg));  // Send previous messages
+                    ws.send(JSON.stringify(msg));
                 });
             }
-            // Send the room name to the client
+            
             ws.send(JSON.stringify({ type: "room", roomId: currentRoom }));
-
         } else if (message.type === "message" && currentRoom) {
-            // Save message to the room
             const newMessage = {
                 user: message.user,
                 text: message.text,
@@ -62,7 +57,6 @@ wss.on("connection", (ws) => {
 
             rooms[currentRoom].push(newMessage);
 
-            // Send the message to all clients in the same room (including the sender)
             clientsInRoom[currentRoom].forEach((client) => {
                 if (client.readyState === WebSocket.OPEN) {
                     client.send(JSON.stringify(newMessage));
@@ -72,7 +66,6 @@ wss.on("connection", (ws) => {
     });
 
     ws.on("close", () => {
-        // Remove the client from the room when they disconnect
         for (const room in clientsInRoom) {
             const index = clientsInRoom[room].indexOf(ws);
             if (index !== -1) {
