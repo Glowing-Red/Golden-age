@@ -1,3 +1,5 @@
+const IPv4 = "10.159.152.84";
+
 const express = require("express");
 const http = require("http");
 const WebSocket = require("ws");
@@ -14,7 +16,7 @@ app.use(express.static(path.join(__dirname, "public")));
 
 wss.on("connection", (ws) => {
     let currentRoom = null;
-
+    
     ws.on("message", (data) => {
         const message = JSON.parse(data);
 
@@ -77,5 +79,5 @@ wss.on("connection", (ws) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-    console.log(`Server running on http://10.159.152.88:${PORT}/`);
+    console.log(`Server running on ${IPv4}:${PORT}/`);
 });

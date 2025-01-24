@@ -1,4 +1,6 @@
-const ws = new WebSocket('ws://10.159.152.88:3000');
+const IPv4 = "10.159.152.84";
+
+const ws = new WebSocket(`ws://${IPv4}:3000`);
 let currentRoom = null;
 let username = prompt("Enter your name:");
 
