@@ -1,71 +1,46 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            background-color: #f4f4f4;
-        }
-        form {
-            background: white;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
-            margin-bottom: 20px;
-            width: 300px;
-            text-align: center;
-        }
-        input {
-            width: 100%;
-            padding: 10px;
-            margin: 10px 0;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-        }
-        button {
-            background: #28a745;
-            color: white;
-            border: none;
-            padding: 10px;
-            width: 100%;
-            cursor: pointer;
-            border-radius: 5px;
-        }
-        button:hover {
-            background: #218838;
-        }
-    </style>
 </head>
+
 <body>
-    <h2>Login</h2>
-    <form action="/login" method="POST">
-        <input type="text" name="username" placeholder="Username" required>
-        <input type="password" name="password" placeholder="Password" required>
+    <h1>Login</h1>
+    <form id="loginForm">
+        <label for="username">Username:</label>
+        <input type="text" id="username" required>
+        <br>
+        <label for="password">Password:</label>
+        <input type="password" id="password" required>
+        <br>
         <button type="submit">Login</button>
     </form>
 
-    <h2>Register</h2>
-    <form action="/register" method="POST">
-        <input type="text" name="username" placeholder="Username" required>
-        <input type="password" name="password" placeholder="Password" required>
-        <button type="submit">Register</button>
-    </form>
-
-    <h2>Validate Logged in</h2>
-    <button onclick="buttonValidate()">Request Valiation</button>
-
     <script>
-        function buttonValidate() {
-            fetch("/validate").then(res => res.json()).then(data => console.log(data));
-        }
+        document.getElementById('loginForm').addEventListener('submit', async function (event) {
+            event.preventDefault();
+
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            const response = await fetch('/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+
+            if (response.ok) {
+                alert('Logged in successfully!');
+                window.location.href = '/home'; // Redirect to chat page after successful login
+            } else {
+                const data = await response.json();
+                alert(data.message || 'Login failed!');
+            }
+        });
     </script>
 </body>
+
 </html>

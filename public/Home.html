@@ -2,26 +2,56 @@
 <html lang="en">
 
 <head>
+    <link rel="stylesheet" href="Assets/Styles/Library.css">
+    <link rel="stylesheet" href="style.css">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chat</title>
+    <title>The Age of The Golden</title>
+    <link rel="icon" type="image/x-icon" href="Assets/Icons/Amber Leaf.png">
+    
+    <script src="/socket.io/socket.io.js"></script>
 </head>
 
 <body>
-    <h1>Chat Room</h1>
-    
-    <div id="user-name">...</div>
-    <div id="room-name">You are not in any room yet.</div>
-    <label for="room-id">Enter Room ID:</label>
-    <input type="text" id="room-id">
-    <button id="join-room">Join Room</button>
+    <div class="container">
+        <header class="painted-div">
+            <a href="" class="left">
+                <img src="Assets/Icons/Leaf.png" alt="">
+                <h1 class="Text-Wrap">Golden-age</h1>
+            </a>
 
-    <div id="chatWindow"></div>
+            <div class="right">
+                <h1><a href="#">Chat</a></h1>
+                <h1><a href="#">Forum</a></h1>
+                <h1><a href="#">Friends</a></h1>
+                <h1><a href="#">Login</a></h1>
+            </div>
+        </header>
 
-    <input type="text" id="message-input" placeholder="Type a message...">
-    <button id="send-message">Send</button>
+        <div class="content">
+            <div class="left">
+                <div class="user-card">
+                    <img src="Assets/Images/pile.png" alt="" class="bg-img">
+                    <img id="Profile" src="Assets/Icons/Profile Placeholder.png" alt="" class="user-img">
 
-    <script src="Home.js"></script>
+                    <div class="user">
+                        <h1 id="Display" class="display Text-Wrap"></h1>
+                        <h2 id="Name" class="name Text-Wrap"></h2>
+                    </div>
+                </div>
+
+                <div id="Tabs" class="tabs"></div>
+            </div>
+
+            <div class="right">
+
+            </div>
+        </div>
+    </div>
+
+    <script src="Assets/Scripts/Library.js"></script>
+    <script src="Assets/Scripts/Script.js"></script>
+    <script src="Assets/Scripts/Home.js"></script>
 </body>
 
 </html>

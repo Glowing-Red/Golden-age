@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register</title>
+</head>
+
+<body>
+    <h1>Create an Account</h1>
+    <form id="registerForm">
+        <label for="username">Username:</label>
+        <input type="text" id="username" required>
+        <br><br>
+        <label for="password">Password:</label>
+        <input type="password" id="password" required>
+        <br><br>
+        <button type="submit">Register</button>
+    </form>
+
+    <p id="errorMessage" style="color: red;"></p>
+
+    <script>
+        const registerForm = document.getElementById('registerForm');
+        const errorMessage = document.getElementById('errorMessage');
+
+        registerForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            const response = await fetch('/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password }),
+            });
+
+            const result = await response.json();
+            if (response.ok) {
+                alert('Registration successful! You can now log in.');
+                window.location.href = '/login'; // Redirect to login page
+            } else {
+                errorMessage.textContent = result.message; // Display error message
+            }
+        });
+    </script>
+</body>
+
+</html>

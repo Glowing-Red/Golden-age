@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat</title>
+
+    <style>
+        .profile-img {
+        display: flex;
+        align-items: center; /* Align image and text vertically */
+        gap: 8px; /* Add spacing between image and text */
+    }
+
+    .profile-img img {
+        width: 30px; /* Set a fixed width */
+        height: 30px; /* Set height equal to width */
+        object-fit: cover; /* Ensure the image fills the area without distortion */
+        border-radius: 50%; /* Optional: makes it circular */
+    }
+
+    .profile-img p {
+        margin: 0; /* Remove default margin */
+        line-height: 30px; /* Match the image height */
+    }
+
+    .message-text {
+        margin: 0;
+    }
+    </style>
+    <script src="/socket.io/socket.io.js"></script>
+</head>
+
+<body>
+    <h1>Welcome to the Chat</h1>
+    <div id="messageContainer"></div>
+
+    <div id="roomControls">
+        <h3>Join a Room</h3>
+    </div>
+
+    <div id="dmControls">
+        <h3>Direct Message Someone</h3>
+    </div>
+
+    <br><br>
+
+    <div id="chatInput" style="display: none;">
+        <input type="text" id="messageInput" placeholder="Type your message">
+        <button onclick="sendMessage()">Send</button>
+    </div>
+
+    <br><br>
+    <a href="/login">Logout</a>
+    <button onclick="CreateDm(1)">Create Dm</button>
+    
+    <script src="home.js"></script>
+</body>
+
+</html>
