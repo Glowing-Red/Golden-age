@@ -3,6 +3,7 @@
 
 <head>
     <link rel="stylesheet" href="Assets/Styles/Library.css">
+    <link rel="stylesheet" href="Assets/Styles/Universal.css">
     <link rel="stylesheet" href="style.css">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -13,6 +14,11 @@
 </head>
 
 <body>
+    <div id="loadingScreen">
+        <div class="circle"></div>
+        <p id="loadingText">Loading...</p>
+    </div>
+
     <div class="container">
         <header class="painted-div">
             <a href="" class="left">
@@ -44,13 +50,14 @@
             </div>
 
             <div class="right">
-
+                <div id="messageContainer"></div>
+                <input type="text" id="messageInput" placeholder="Type your message">
             </div>
         </div>
     </div>
-
+    
     <script src="Assets/Scripts/Library.js"></script>
-    <script src="Assets/Scripts/Script.js"></script>
+    <script src="Assets/Scripts/Universal.js"></script>
     <script src="Assets/Scripts/Home.js"></script>
 </body>
 

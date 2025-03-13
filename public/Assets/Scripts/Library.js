@@ -2,6 +2,30 @@ function Wait(milliseconds) {
     return new Promise(resolve => setTimeout(resolve, milliseconds));
 }
 
+function WaitForTransition(element, property, debounce = 1000) {
+    return new Promise((resolve) => {
+        let resolved = false;
+
+        function onTransitionEnd(event) {
+            if (event === property || event.propertyName === property) {
+                resolved = true;
+                clearTimeout(fallbackTimeout);
+
+                resolve();
+                element.removeEventListener("transitionend", onTransitionEnd);
+            }
+        }
+        
+        const fallbackTimeout = setTimeout(() => {
+            if (!resolved) {
+                onTransitionEnd(property);
+            }
+        }, debounce);
+
+        element.addEventListener("transitionend", onTransitionEnd);
+    });
+}
+
 function FormatString(template, ...values) {
     return template.replace(/%s/g, () => values.shift());
 }
@@ -250,39 +274,10 @@ function Instance(instance, Properties, Parent) {
 }
 
 function WrapText(element) {
-    const originalFontSize = parseFloat(window.getComputedStyle(element).fontSize);
-
-    function ResizeFontSize() {
-        let fontSize = parseFloat(window.getComputedStyle(element).fontSize);
-
-        while (isOverflow(element) && fontSize > 1) {
-            fontSize--;
-            element.style.fontSize = fontSize + "px";
-        }
-
-        while (!isOverflow(element) && fontSize < originalFontSize) {
-            fontSize++;
-            element.style.fontSize = fontSize + "px";
-
-            if (isOverflow(element)) {
-                fontSize--;
-                element.style.fontSize = fontSize + "px";
-
-                return;
-            }
-        }
+    if (element.UpdateTextWrap) {
+        return;
     }
 
-    ResizeFontSize();
-
-    const observer = new ResizeObserver(() => {
-        ResizeFontSize();
-    });
-
-    observer.observe(element);
-}
-
-function WrapText(element) {
     const originalFontSize = parseFloat(window.getComputedStyle(element).fontSize);
 
     function ResizeFontSize() {
@@ -293,7 +288,7 @@ function WrapText(element) {
             element.style.fontSize = fontSize + "px";
         }
 
-        while (!IsOverflow(element) && fontSize < originalFontSize) {
+        while (!IsOverflow(element) && (originalFontSize && fontSize < originalFontSize)) {
             fontSize++;
             element.style.fontSize = fontSize + "px";
 
@@ -307,6 +302,12 @@ function WrapText(element) {
     }
 
     ResizeFontSize();
+
+    Object.defineProperty(element, "UpdateTextWrap", {
+        value: function () {
+            ResizeFontSize();
+        }
+    });
 
     const observer = new ResizeObserver(() => {
         ResizeFontSize();

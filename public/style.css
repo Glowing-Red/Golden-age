@@ -165,16 +165,6 @@ header .right {
     width: 375px;
 }
 
-.content .right {
-    flex: 1;
-
-    margin: 0 25px;
-
-    height: 70vh;
-
-    background-color: green;
-}
-
 .user-card {
     position: relative;
     width: 100%;
@@ -282,15 +272,11 @@ header .right {
 
     box-shadow: 0px 0px 0.5px rgba(0, 0, 0, 1);
     transition: background-color ease-in-out 0.2s, box-shadow ease-in-out 0.2s;
-
-    z-index: 1;
 }
 
 .content .left .tabs .tab.selected {
     background-color: #FBDFCC;
     box-shadow: 0px 0px 10px rgba(0, 0, 0, 1);
-
-    z-index: 2;
 }
 .content .left .tabs .tab.selected img {
     filter: grayscale(0%) brightness(100%) contrast(100%);
@@ -299,8 +285,6 @@ header .right {
 .content .left .tabs .tab:hover {
     background-color: #FBDFCC;
     box-shadow: 0px 0px 10px rgba(0, 0, 0, 1);
-    
-    z-index: 3;
 }
 
 .content .left .tabs .tab:hover img {
@@ -314,7 +298,56 @@ header .right {
 
     filter: grayscale(100%) brightness(70%) contrast(90%);
     transition: filter 0.3s ease;
-    /* Smooth transition for the color effect */
+}
+
+.content .right {
+    display: flex;
+    flex-direction: column;
+    justify-content: start;
+    align-items: center;
+    flex: 1;
+    
+    margin: 0 25px;
+    padding: 25px;
+
+    height: 70vh;
+    
+    background-color: #ffff;
+    border-radius: 10px;
+    box-shadow: 0 4px 14px rgba(34, 55, 77, .15);
+
+    overflow: hidden;
+}
+
+#messageContainer {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    
+    width: 100%;
+    overflow-y: auto;
+}
+
+.profile-img {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.profile-img img {
+    width: 30px;
+    height: 30px;
+    object-fit: cover;
+    border-radius: 50%;
+}
+
+.profile-img p {
+    margin: 0;
+    line-height: 30px;
+}
+
+.message-text {
+    margin: 0;
 }
 
 @media (max-width: 400px) {
