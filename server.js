@@ -99,12 +99,12 @@
 */
 //#region logic
 //#region vars
-const IPv4 = "10.159.152.122";
 
 const express = require('express');
 const cookieParser = require('cookie-parser');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 const http = require('http');
 const socketIo = require('socket.io');
 const { parse } = require('cookie');
@@ -116,10 +116,24 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
 
+const nodemailer = require("nodemailer");
+const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+        user: 'fabian.youtubbe@gmail.com',
+        pass: 'gkjs zcqn mana gxap'
+    }
+});
+
 app.use(express.json());
 app.use(cookieParser());
 app.use(express.static("public"));
 app.use(express.static(path.join(__dirname, "public")));
+
+const IPv4 = "localhost";
+const PORT = process.env.PORT || 3000;
+const local = true;
+const domain = `http://${(local == true ? "localhost" : IPv4)}:${PORT}`;
 
 const SECRET_KEY = "Rosalith's Very Secret, Very Personal, Very Professional, Very Strong and very secure key in production.";
 
@@ -129,7 +143,10 @@ const client = new MongoClient(uri);
 let db;
 
 const lockedIdsSet = new Set();
-const lockedSessionsMap = new Map();
+const lockedTokensSet = new Set();
+const emailCooldownSet = new Set();
+
+const confirmAccountMap = new Map();
 
 async function connectToDatabase() {
     try {
@@ -205,29 +222,41 @@ connectToDatabase().then(async () => {
     console.error(err);
 });
 
-function generateToken(userId) {
-    const randomString = Math.random().toString(36).substring(2, 14);
+function GenerateSessionToken(userId) {
+    const firstRandomString = Math.random().toString(36).slice(2);
+    const secondRandomString = Math.random().toString(36).slice(2);
+    const thirdRandomString = Math.random().toString(36).slice(2);
     
-    return jwt.sign({ Token: `session_${userId}_${Date.now()}_${randomString}` }, SECRET_KEY);
+    return jwt.sign({ Token: `session_${firstRandomString}${userId}${secondRandomString}${Date.now()}${thirdRandomString}` }, SECRET_KEY);
+}
+
+async function RemoveAllSessionTokens(userId) {
+    const collection = db.collection("Sessions");
+    
+    try {
+        const result = await collection.deleteMany({ UserId: userId });
+        
+        console.log(`Deleted ${result.deletedCount} session(s) for userId ${userId}`);
+    } catch (err) {
+        console.error("Failed to expire sessions:", err);
+    }
 }
 
 async function GetCredentials(cookie) {
+    console.log("Cookie:", cookie);
+
     if (!cookie) {
         return { Success: false, UserId: null };
     }
     
     const collection = db.collection("Sessions");
-    const data = await collection.findOne({ Token: cookie });
+    const data = await collection.findOne({ _id: cookie });
 
     if (data) {
-        return { Success: true, UserId: data._id };
+        return { Success: true, UserId: data.UserId };
     }
     
     return { Success: false, UserId: null };
-}
-
-async function GetAccount() {
-
 }
 
 const GenerateDirectId = (user1, user2) => {
@@ -238,7 +267,7 @@ async function GetChats(userId, type) {
     const collection = db.collection("Rooms");
     const rooms = await collection.find({ Type: type, Members: userId }).toArray();
     
-    return rooms;
+    return rooms.map(room => ({ Id: room._id }));;
 }
 
 async function GenerateUserId() {
@@ -263,6 +292,204 @@ async function GenerateUserId() {
     }, (5 * 60000));
 
     return newId;
+}
+
+// Mail Functions
+async function GenerateUniqueToken(length = 32) {
+    let token;
+    let exists = true;
+    
+    do {
+        token = crypto.randomBytes(length).toString("hex");
+
+        if (lockedTokensSet.has(token)) {
+            continue;
+        }
+
+        exists = false;
+    } while (exists);
+
+    return token;
+}
+
+async function sendPasswordResetEmail(toEmail, userName, resetToken) {
+    const resetUrl = `https://discord.com/invite/PrenvUW6`;
+
+    const mailOptions = {
+        from: '"Golden-age" <fabian.youtubbe@gmail.com>',
+        to: toEmail,
+        subject: 'Password Reset',
+        html: `
+<table border="0" cellpadding="0" cellspacing="0" style="margin:0;padding:0;background-color:#ffffff;border-radius:16px" width="100%" role="presentation">
+    <tbody><tr>
+        <td align="center" valign="top">
+
+            <table border="0" cellspacing="0" cellpadding="0" role="presentation">
+                <tbody><tr>
+                    <td style="font-size:1px;line-height:1px" height="24"></td>
+                </tr>
+            </tbody></table>
+
+            
+            <table cellspacing="0" cellpadding="0" border="0" width="600" align="center" style="background-color:#000000;width:600px;min-width:600px" role="presentation">
+                <tbody><tr>
+                    <td style="width:72px;font-size:1px;line-height:1px" width="72"></td>
+                    <td style="width:456px" width="456">
+
+                        
+                        <table border="0" cellspacing="0" cellpadding="0" role="presentation">
+                            <tbody><tr>
+                                <td style="font-size:1px;line-height:1px" height="72"></td>
+                            </tr>
+                        </tbody></table>
+                        
+                        
+                        <table border="0" cellspacing="0" cellpadding="0" role="presentation">
+                            <tbody><tr>
+                                <td>
+                                  <a href="https://www.rockstargames.com/" style="text-decoration:none" target="_blank"><img src="https://cdn.discordapp.com/attachments/711636453452415019/1373399352948555916/1747514319533.png?ex=682a4552&is=6828f3d2&hm=1a50357fc6db789c2ad036ab42218a04c5c1c40621855d8a2ba6455781a5eea1&" height="85" width="85" border="0" style="display:block;color:#f0f0f0;font-size:24px;font-family:'HelveticaW1G',Helvetica,Arial,sans-serif" alt="Kindred Logo" class="CToWUd" data-bit="iit"></a>
+                                </td>
+                            </tr>           
+                        </tbody></table>
+                        
+                        
+                        <table border="0" cellspacing="0" cellpadding="0" role="presentation">
+                            <tbody><tr>
+                                <td style="font-size:1px;line-height:1px" height="36"></td>
+                            </tr>
+                        </tbody></table>
+                        
+                        
+
+                        
+
+
+<table border="0" cellspacing="0" cellpadding="0" role="presentation" width="370" style="max-width:370px">
+    <tbody><tr>
+        <td style="font-family:Helvetica,Arial,sans-serif;font-size:38px;letter-spacing:-1.46px;line-height:42px;color:#ffffff">
+            <span style="font-family:Helvetica,Arial,sans-serif;font-size:38px;letter-spacing:-1.46px;line-height:42px;color:#ffffff">
+                <strong>Password Reset</strong>
+            </span>
+        </td>
+    </tr>           
+</tbody></table>
+
+
+<table border="0" cellspacing="0" cellpadding="0" role="presentation">
+    <tbody><tr>
+        <td style="font-size:1px;line-height:1px" height="48"></td>
+    </tr>
+</tbody></table>
+
+
+<table border="0" cellspacing="0" cellpadding="0" role="presentation">
+    <tbody><tr>
+        <td style="font-family:Helvetica,Arial,sans-serif;font-size:24px;letter-spacing:0.48px;line-height:36px;color:#f0f0f0">
+            <span style="font-family:Helvetica,Arial,sans-serif;font-size:24px;letter-spacing:0.48px;line-height:36px;color:#f0f0f0">A request was just made to reset the password for your Golden-age account <span style="
+    font-weight: bold;
+">${userName}</span><span>.</span><br><span> If this was you, please click the following link before it expires: </span><a href="${resetUrl}" target="_blank"><span style="text-decoration:underline;color:#ffffff">Reset Password</span></a></span>
+        </td>
+    </tr>           
+</tbody></table>
+
+
+
+
+<table border="0" cellspacing="0" cellpadding="0" role="presentation">
+    <tbody><tr>
+        <td style="font-size:1px;line-height:1px" height="48"></td>
+    </tr>
+</tbody></table>
+    
+                        
+                        
+                        
+                        <table border="0" cellspacing="0" cellpadding="0" role="presentation">
+    <tbody><tr>
+        <td style="font-size:1px;line-height:1px" height="48"></td>
+    </tr>
+</tbody></table>
+<hr style="border-width:0;background:#a6a6a6;color:#a6a6a6;height:2px">
+<table border="0" cellspacing="0" cellpadding="0" role="presentation">
+    <tbody><tr>
+        <td style="font-size:1px;line-height:1px" height="48"></td>
+    </tr>
+</tbody></table>
+<table border="0" cellspacing="0" cellpadding="0" role="presentation">
+    <tbody><tr>
+        <td style="font-family:Helvetica,Arial,sans-serif;font-size:16px;letter-spacing:0.25px;line-height:24px;color:#a6a6a6">
+            <span style="font-family:Helvetica,Arial,sans-serif;font-size:16px;letter-spacing:0.25px;line-height:24px;color:#a6a6a6"><span style="
+    font-weight: bold;
+">This administrative message was sent to you by Kindred to help manage and protect your account.</span><br>You're receiving this email because an action related to your account was requested, the link will be expired in 15 minutes. If you did not initiate this request, you can safely ignore this message.<br>Kindred is committed to providing a safe, welcoming space where you can stay connected, share stories, and enjoy meaningful moments online.<br>
+                <br>
+                © ${new Date().getFullYear()} <span>Kindred</span>. All Rights Reserved.
+                <br>
+                <br>
+                <a href="https://www.rockstargames.com/legal" target="_blank""><span style="color:#a6a6a6;text-decoration:underline">Terms of Service</span></a>
+                <br>
+                <a href="https://www.rockstargames.com/privacy" target="_blank"><span style="color:#a6a6a6;text-decoration:underline">Privacy Policy</span></a>
+                <br>
+                <a href="https://support.rockstargames.com/" target="_blank"><span style="color:#a6a6a6;text-decoration:underline">Support</span></a>
+            </span>
+        </td>
+    </tr>
+</tbody></table>
+<table border="0" cellspacing="0" cellpadding="0" role="presentation">
+    <tbody><tr>
+        <td style="font-size:1px;line-height:1px" height="24"></td>
+    </tr>
+</tbody></table>
+
+ 
+                        
+
+            
+            
+            
+                    </td>
+                    <td style="width:72px;font-size:1px;line-height:1px" width="72"></td>
+                </tr>
+            </tbody></table>
+            
+            <table border="0" cellspacing="0" cellpadding="0" role="presentation">
+                <tbody><tr>
+                    <td style="font-size:1px;line-height:1px" height="24"></td>
+                </tr>
+            </tbody></table>
+        </td>
+    </tr>
+</tbody></table>
+        `
+    };
+    
+    try {
+        const info = await transporter.sendMail(mailOptions);
+        console.log("Reset email sent:", info.messageId);
+    } catch (error) {
+        console.error("Error sending email:", error);
+    }
+}
+
+async function RegisterAccount(email, username, password) {
+    if (emailCooldownSet.has(email)) {
+        return;
+    }
+
+    emailCooldownSet.add(email);
+    setTimeout(() => {
+        emailCooldownSet.delete(email);
+    }, (60 * 1000));
+
+    const confirmToken = await GenerateUniqueToken();
+    lockedTokensSet.add(confirmToken);
+
+
+    setTimeout(() => {
+        confirmAccountMap.delete(confirmToken);
+        lockedTokensSet.delete(confirmToken);
+    }, (15 * 60 * 1000));
+
+    const url = `${domain}/confirm-creation?token=${confirmToken}`;
 }
 //#endregion
 
@@ -404,35 +631,15 @@ app.post('/login', async (req, res) => {
     if (!isPasswordValid) {
         return res.status(401).json({ message: 'Invalid credentials' });
     }
-
-    if (lockedSessionsMap.has(user._id)) {
-        res.cookie('auth_token', lockedSessionsMap.get(user._id), { httpOnly: true, secure: false });
-
-        return res.json({ Message: 'Logged in successfully' });
-    }
     
     const sesssionsCollection = db.collection("Sessions");
-    const sessionExists = await sesssionsCollection.findOne({ _id: user._id });
-
-    if (sessionExists) {
-        res.cookie('auth_token', sessionExists.Token, { httpOnly: true, secure: false });
-    
-        return res.json({ Message: 'Logged in successfully' });
-    }
-    
-    const token = generateToken(user._id);
+    const token = GenerateSessionToken(user._id);
     const newSession = {
-        _id: user._id,
-        Token: token
+        _id: token,
+        UserId: user._id
     };
 
-    lockedSessionsMap.set(user._id, token);
-    setTimeout(() => {
-        lockedSessionsMap.delete(user._id);
-    }, (1 * 60000));
-
     sesssionsCollection.insertOne(newSession);
-    
     res.cookie('auth_token', token, { httpOnly: true, secure: false });
 
     return res.json({ Message: 'Logged in successfully' });
@@ -440,14 +647,16 @@ app.post('/login', async (req, res) => {
 
 // Route for user registration (sign up)
 app.post('/register', async (req, res) => {
-    const { username, password } = req.body;
+    const { username, email, password } = req.body;
 
-    if (!username || !password) {
+    if (!username || !email || !password) {
         return res.status(400).json({ message: "Username and password are required" });
     }
-
+    
     try {
+        const resetUrl = `${domain}/confirm-creation?token=${resetToken}`;
         const existingUser = await collection.findOne({ Username: username });
+        
         if (existingUser) {
             return res.status(400).json({ message: "Username already taken" });
         }
@@ -510,7 +719,7 @@ class ConnectionHandler {
         Socket.on('disconnect', this.Disconnect.bind(this));
     }
 
-    JoinRoom(roomId) {
+    async JoinRoom(roomId) {
         const { Socket, UserId, DataBase } = this;
 
         if (this.CurrentRoom) {
@@ -519,7 +728,7 @@ class ConnectionHandler {
         }
         
         const collection = DataBase.collection("Rooms");
-        const room = collection.findOne({ _id: roomId });
+        const room = await collection.findOne({ _id: roomId });
 
         if (!room) {
             Socket.emit("errorMessage", 'Room not found');
@@ -541,7 +750,7 @@ class ConnectionHandler {
         // Send chat history to the user
         Socket.emit('chatHistory', room.Messages);
 
-        console.log(`User ${UserId} joined room: ${room.Nickname}`);
+        console.log(`User ${UserId} joined room: ${room.Nickname} (${room})`);
 
         return;
     }
@@ -550,7 +759,7 @@ class ConnectionHandler {
         const { Socket, UserId, Io, DataBase } = this;
         
         const collection = DataBase.collection("Rooms");
-        const room = collection.findOne({ _id: roomId });
+        const room = await collection.findOne({ _id: roomId });
 
         if (!room) {
             Socket.emit("errorMessage", 'Room not found');
@@ -574,12 +783,13 @@ class ConnectionHandler {
 
         // Create a message object with the userId, message, and timestamp
         const newMessage = {
-            Sender: socket.userId,
+            Sender: Socket.userId,
             Text: message,
             Date: new Date().toISOString(), // Store time as ISO string
         };
         
         // Store the message in the room's history
+        console.log("update: ", room._id);
         await collection.updateOne(
             { _id: room._id },
             { $push: { Messages: newMessage } }
@@ -601,12 +811,11 @@ class ConnectionHandler {
 
 // WebSocket connections and handling chat rooms
 io.on('connection', (socket) => {
-    console.log(`User connected with ID: ${socket.userId}`);
+    console.log(`User connected with Id:${socket.userId}`);
 
     new ConnectionHandler(io, socket, db);
 });
 
-const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-    console.log(`Server running on ${IPv4}:${PORT}/home`);
+    console.log(`Server running on ${domain}/home`);
 });

@@ -29,7 +29,7 @@ async function CreateDirectMessage(target) {
     if (response.ok) {
         const data = await response.json();
         console.log(data);
-
+        
         return data.Success;
     }
     
