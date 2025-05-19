@@ -133,7 +133,7 @@ app.use(express.static(path.join(__dirname, "public")));
 
 const IPv4 = "10.159.152.79";
 const PORT = process.env.PORT || 3000;
-const local = false;
+const local = true;
 const domain = `http://${(local == true ? "localhost" : IPv4)}:${PORT}`;
 
 const SECRET_KEY = "Rosalith's Very Secret, Very Personal, Very Professional, Very Strong and very secure key in production.";
@@ -806,8 +806,13 @@ app.get('/registration-confirmation', async (req, res) => {
             return res.status(500).send('Error reading template.');
         }
         
-        let html = document.replace('{{USERNAME}}', data.Username)
-            .replace('{{MESSAGE}}', `Your email is: \""${data.Email}\", and your hashed password is: \"${data.Password}\"`, );
+        let injectedTemplate = `
+            <template id="injected-attributes"></template>
+        `;
+
+        injectedTemplate = injectedTemplate.replace("></template>", `data-username-unavailable="true"></template>`);
+
+        const html = document.replace('</head>', `${injectedTemplate}</head>`);
 
         return res.send(html);
     });

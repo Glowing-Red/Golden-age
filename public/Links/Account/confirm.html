@@ -6,7 +6,21 @@
 </head>
 <body>
     <h1>Account Registration Confirmation</h1>
-    <h1>Welcome, {{USERNAME}}</h1>
-    <p>Your custom message: {{MESSAGE}}</p>
+    <h1 id="a">Welcome, {{USERNAME}}</h1>
+    <p id="b">Your custom message: {{MESSAGE}}</p>
+    <p id="c">what</p>
+
+    <script>
+        const attributes = document.getElementById("injected-attributes");
+
+        if (attributes) {
+            const username = attributes.getAttribute('data-username');
+            const email = attributes.getAttribute('data-email');
+            
+            document.getElementById("a").innerText = username;
+            document.getElementById("b").innerText = email;
+            document.getElementById("c").innerText = (attributes.getAttribute("data-username-unavailable") == "true");
+        }
+    </script>
 </body>
 </html>
