@@ -1,5 +1,10 @@
 const nodemailer = require("nodemailer");
 
+const IPv4 = "10.159.152.79";
+const PORT = process.env.PORT || 3000;
+const local = false;
+const domain = `http://${(local == true ? "localhost" : IPv4)}:${PORT}`;
+
 const transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
@@ -43,7 +48,7 @@ async function sendPasswordResetEmail(toEmail, userName, resetToken) {
                         <table border="0" cellspacing="0" cellpadding="0" role="presentation">
                             <tbody><tr>
                                 <td>
-                                  <a href="https://www.rockstargames.com/" style="text-decoration:none" target="_blank"><img src="https://cdn.discordapp.com/attachments/711636453452415019/1373399352948555916/1747514319533.png?ex=682a4552&is=6828f3d2&hm=1a50357fc6db789c2ad036ab42218a04c5c1c40621855d8a2ba6455781a5eea1&" height="85" width="85" border="0" style="display:block;color:#f0f0f0;font-size:24px;font-family:'HelveticaW1G',Helvetica,Arial,sans-serif" alt="Kindred Logo" class="CToWUd" data-bit="iit"></a>
+                                  <a href="https://www.rockstargames.com/" style="text-decoration:none" target="_blank"><img src="" height="85" width="85" border="0" style="display:block;color:#f0f0f0;font-size:24px;font-family:'HelveticaW1G',Helvetica,Arial,sans-serif" alt="Kindred Logo" class="CToWUd" data-bit="iit"></a>
                                 </td>
                             </tr>           
                         </tbody></table>
@@ -176,7 +181,7 @@ async function sendPasswordResetEmail(toEmail, userName, resetToken) {
 }
 
 async function SendAccountConfirmation(toEmail, userName, confirmToken) {
-    const resetUrl = `http://localhost:3000?Token=confirmToken`;
+    const resetUrl = `${domain}/registration-confirmation?Token=${confirmToken}`;
 
     const mailOptions = {
         from: '"Golden-age" <fabian.youtubbe@gmail.com>',
@@ -210,7 +215,7 @@ async function SendAccountConfirmation(toEmail, userName, confirmToken) {
                         <table border="0" cellspacing="0" cellpadding="0" role="presentation">
                             <tbody><tr>
                                 <td>
-                                  <a href="https://www.rockstargames.com/" style="text-decoration:none" target="_blank"><img src="https://cdn.discordapp.com/attachments/711636453452415019/1373399352948555916/1747514319533.png?ex=682a4552&is=6828f3d2&hm=1a50357fc6db789c2ad036ab42218a04c5c1c40621855d8a2ba6455781a5eea1&" height="85" width="85" border="0" style="display:block;color:#f0f0f0;font-size:24px;font-family:'HelveticaW1G',Helvetica,Arial,sans-serif" alt="Kindred Logo" class="CToWUd" data-bit="iit"></a>
+                                  <a href="https://www.rockstargames.com/" style="text-decoration:none" target="_blank"><img src="https://i.ibb.co/DfXFhrZ1/Amber-Leaf.png" height="85" width="85" border="0" style="display:block;color:#f0f0f0;font-size:24px;font-family:'HelveticaW1G',Helvetica,Arial,sans-serif" alt="Kindred Logo" class="CToWUd" data-bit="iit"></a>
                                 </td>
                             </tr>           
                         </tbody></table>
@@ -333,4 +338,4 @@ async function SendAccountConfirmation(toEmail, userName, confirmToken) {
     }
 }
 
-SendAccountConfirmation("dynablock996@gmail.com", "4KHax", "testToken");
+SendAccountConfirmation("fraizor.youtubbe@gmail.com", "4KHax", "testToken");
