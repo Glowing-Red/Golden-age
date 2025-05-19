@@ -567,7 +567,7 @@ async function sendPasswordResetEmail(toEmail, userName, resetToken) {
     }
 }
 
-async function RegisterAccount(email, username, password) {
+async function SignupAccount(email, username, password) {
     if (!IsValidEmail(email)) {
         return false;
     }
@@ -588,7 +588,8 @@ async function RegisterAccount(email, username, password) {
     confirmAccountMap.set(confirmToken, {
         Username: username,
         Email: email,
-        Password: await bcrypt.hash(password, 10)
+        Password: await bcrypt.hash(password, 10),
+        Timeouts: timeouts
     });
 
     const deleteId = timeouts.Create(() => {
@@ -766,21 +767,28 @@ async function RegisterAccount(email, username, password) {
 }
 
 (async () => {
-  const result = await RegisterAccount("fraizor.youtubbe@gmail.com", "4KHax", "123K");
-  console.log("RegisterAccount result:", result);
+  const result = await SignupAccount("fraizor.youtubbe@gmail.com", "4KHax", "123K");
+  console.log("SignupAccount result:", result);
 })();
 
 // Serve the continue registration page (must be logged in to access)
 app.get('/registration-confirmation', async (req, res) => {
     const token = req.query.Token;
 
-    function ErrorResponse(mssg) {
-        fs.readFile(path.join(__dirname, "public", "Links", "Account", "err.html"), 'utf8', (err, data) => {
+    function ErrorResponse(errorMsg) {
+        fs.readFile(path.join(__dirname, "public", "Links", "confirm registration.html"), 'utf8', (err, document) => {
             if (err) {
                 return res.status(500).send('Error reading template.');
             }
             
-            let html = data.replace('{{ERROR_MESSAGE}}', mssg);
+            let injectedTemplate = `
+                <template id="injected-attributes"></template>
+            `;
+
+            injectedTemplate = injectedTemplate.replace("></template>", `data-error="${errorMsg}"></template>`);
+
+            const html = document.replace('</head>', `${injectedTemplate}</head>`);
+
             return res.send(html);
         });
     }
@@ -790,7 +798,7 @@ app.get('/registration-confirmation', async (req, res) => {
     }
 
     if (!confirmAccountMap.has(token)) {
-        return ErrorResponse(`No account tied to \"${token}\" Token`);
+        return ErrorResponse(`No account tied to ''${token}'' Token`);
     }
 
     const data = confirmAccountMap.get(token);
@@ -801,7 +809,7 @@ app.get('/registration-confirmation', async (req, res) => {
     lockedUsernamesMap.set(data.Username, data.Email);
     data.Locked = true;
     
-    fs.readFile(path.join(__dirname, "public", "Links", "Account", "confirm.html"), 'utf8', (err, document) => {
+    fs.readFile(path.join(__dirname, "public", "Links", "confirm registration.html"), 'utf8', (err, document) => {
         if (err) {
             return res.status(500).send('Error reading template.');
         }
@@ -810,7 +818,8 @@ app.get('/registration-confirmation', async (req, res) => {
             <template id="injected-attributes"></template>
         `;
 
-        injectedTemplate = injectedTemplate.replace("></template>", `data-username-unavailable="true"></template>`);
+        injectedTemplate = injectedTemplate.replace("></template>", `data-username="${data.Username}"></template>`);
+        injectedTemplate = injectedTemplate.replace("></template>", `data-email="${data.Email}"></template>`);
 
         const html = document.replace('</head>', `${injectedTemplate}</head>`);
 
