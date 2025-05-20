@@ -291,7 +291,7 @@ async function GenerateUserId() {
 
     setTimeout(() => {
         lockedIdsSet.delete(newId);
-    }, (5 * 60000));
+    }, (5 * 60 * 1000));
 
     return newId;
 }
@@ -594,7 +594,7 @@ async function SignupAccount(email, username, password) {
     const timeouts = new TimeoutManager();
 
     emailCooldownSet.add(email);
-    timeouts.Create(() => {
+    setTimeout(() => {
         emailCooldownSet.delete(email);
     }, (1 * 60 * 1000));
 
@@ -845,16 +845,71 @@ app.get('/registration-confirmation', async (req, res) => {
     });
 });
 
-app.post('/api/confirm-registration', async (req, res) => {
-    const { name, token } = req.body;
+app.post('/api/lock-registration-name', async (req, res) => {
+    const { Token, Name } = req.body;
 
-    if (!name || !token) {
+    if (!Name || !Token) {
         return res.json({ Success: false, Message: "Missing name or token" });
     }
 
-    const available = await NameAvailable(name);
+    const data = confirmAccountMap.get(Token);
+    if (!data) {
+        return res.json({ Success: false, Message: "Data tied to registration token not found" });
+    }
 
+    if (data.Locked) {
+        return res.json({ Success: false, Message: "The username is already locked?" });
+    }
 
+    const available = await NameAvailable(Name);
+    if (!available) {
+        return res.json({ Success: false, Message: "Name unavailable" });
+    }
+});
+
+app.post('/api/confirm-registration', async (req, res) => {
+    const { Token } = req.body;
+
+    if (!Token) {
+        return res.json({ Success: false, Message: "Missing token" });
+    }
+
+    const data = confirmAccountMap.get(Token);
+
+    if (!data) {
+        return res.json({ Success: false, Message: "Account data to confirm registration with not found" });
+    }
+
+    if (!data.Locked) {
+        return res.json({ Success: false, Message: "The username needs to be confirmed" });
+    }
+
+    const timeouts = data.Timeouts;
+    const accountData = {
+        _id: GenerateUserId(),
+        Date: Date.now(),
+        Username: data.Username,
+        Email: data.Email,
+        Display: data.Username,
+        Password: data.Password
+    };
+
+    timeouts.CancelAll();
+    confirmAccountMap.delete(Token);
+    lockedTokensSet.delete(Token);
+
+    timeouts.Create(() => {
+        lockedUsernamesMap.delete(accountData.Username);
+    }, (5 * 60 * 1000));
+
+    const collection = db.collection("Accounts");
+    const result = await collection.insertOne(accountData);
+
+    if (result.acknowledged) {
+        return res.json({ Success: true, Message: "Account created!" });
+    }
+
+    return res.json({ Success: false, Message: "Something went wrong" });
 });
 
 app.post('/name-available/:name', async (req, res) => {
