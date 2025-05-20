@@ -228,16 +228,16 @@ function GenerateSessionToken(userId) {
     const firstRandomString = Math.random().toString(36).slice(2);
     const secondRandomString = Math.random().toString(36).slice(2);
     const thirdRandomString = Math.random().toString(36).slice(2);
-    
+
     return jwt.sign({ Token: `session_${firstRandomString}${userId}${secondRandomString}${Date.now()}${thirdRandomString}` }, SECRET_KEY);
 }
 
 async function RemoveAllSessionTokens(userId) {
     const collection = db.collection("Sessions");
-    
+
     try {
         const result = await collection.deleteMany({ UserId: userId });
-        
+
         console.log(`Deleted ${result.deletedCount} session(s) for userId ${userId}`);
     } catch (err) {
         console.error("Failed to expire sessions:", err);
@@ -250,14 +250,14 @@ async function GetCredentials(cookie) {
     if (!cookie) {
         return { Success: false, UserId: null };
     }
-    
+
     const collection = db.collection("Sessions");
     const data = await collection.findOne({ _id: cookie });
 
     if (data) {
         return { Success: true, UserId: data.UserId };
     }
-    
+
     return { Success: false, UserId: null };
 }
 
@@ -268,7 +268,7 @@ const GenerateDirectId = (user1, user2) => {
 async function GetChats(userId, type) {
     const collection = db.collection("Rooms");
     const rooms = await collection.find({ Type: type, Members: userId }).toArray();
-    
+
     return rooms.map(room => ({ Id: room._id }));;
 }
 
@@ -300,7 +300,7 @@ async function GenerateUserId() {
 async function GenerateUniqueToken(length = 32, ignoreLocked = false) {
     let token;
     let exists = true;
-    
+
     do {
         token = crypto.randomBytes(length).toString("hex");
 
@@ -365,7 +365,7 @@ class TimeoutManager {
 
             return true;
         }
-        
+
         return false;
     }
 
@@ -397,7 +397,7 @@ async function SendEmail(body, maxAttempts = 1, delay = 5000) {
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         try {
             const info = await transporter.sendMail(body);
-            
+
             return { Success: true, Response: info };
         } catch (error) {
             if (attempt < maxAttempts) {
@@ -558,13 +558,28 @@ async function sendPasswordResetEmail(toEmail, userName, resetToken) {
 </tbody></table>
         `
     };
-    
+
     try {
         const info = await transporter.sendMail(mailOptions);
         console.log("Reset email sent:", info.messageId);
     } catch (error) {
         console.error("Error sending email:", error);
     }
+}
+
+async function NameAvailable(name) {
+    const accountsCollection = db.collection("Accounts");
+
+    if (lockedUsernamesMap.has(name)) {
+        return false;
+    }
+
+    const exists = await accountsCollection.findOne({ Username: name });
+    if (exists) {
+        return false;
+    }
+
+    return true;
 }
 
 async function SignupAccount(email, username, password) {
@@ -759,7 +774,7 @@ async function SignupAccount(email, username, password) {
     }
     else {
         timeouts.Activate(deleteId);
-        
+
         console.log("Error sending email", result.Response);
     }
 
@@ -767,8 +782,8 @@ async function SignupAccount(email, username, password) {
 }
 
 (async () => {
-  const result = await SignupAccount("fraizor.youtubbe@gmail.com", "4KHax", "123K");
-  console.log("SignupAccount result:", result);
+    const result = await SignupAccount("fraizor.youtubbe@gmail.com", "4KHax", "123K");
+    console.log("SignupAccount result:", result);
 })();
 
 // Serve the continue registration page (must be logged in to access)
@@ -780,7 +795,7 @@ app.get('/registration-confirmation', async (req, res) => {
             if (err) {
                 return res.status(500).send('Error reading template.');
             }
-            
+
             let injectedTemplate = `
                 <template id="injected-attributes"></template>
             `;
@@ -802,21 +817,24 @@ app.get('/registration-confirmation', async (req, res) => {
     }
 
     const data = confirmAccountMap.get(token);
+    let injectedTemplate = `
+        <template id="injected-attributes"></template>
+    `;
+
+    const accountsCollection = db.collection("Accounts");
     if (lockedUsernamesMap.has(data.Username) && lockedUsernamesMap.get(data.Username) != data.Email) {
-        return ErrorResponse(`Username not available`);
+        injectedTemplate = injectedTemplate.replace("></template>", `data-username-unavailable="true"></template>`);
+    } else if (await accountsCollection.findOne({ Username: data.Username })) {
+        injectedTemplate = injectedTemplate.replace("></template>", `data-username-unavailable="true"></template>`);
+    } else {
+        lockedUsernamesMap.set(data.Username, data.Email);
+        data.Locked = true;
     }
 
-    lockedUsernamesMap.set(data.Username, data.Email);
-    data.Locked = true;
-    
     fs.readFile(path.join(__dirname, "public", "Links", "confirm registration.html"), 'utf8', (err, document) => {
         if (err) {
             return res.status(500).send('Error reading template.');
         }
-        
-        let injectedTemplate = `
-            <template id="injected-attributes"></template>
-        `;
 
         injectedTemplate = injectedTemplate.replace("></template>", `data-username="${data.Username}"></template>`);
         injectedTemplate = injectedTemplate.replace("></template>", `data-email="${data.Email}"></template>`);
@@ -825,6 +843,24 @@ app.get('/registration-confirmation', async (req, res) => {
 
         return res.send(html);
     });
+});
+
+app.post('/api/confirm-registration', async (req, res) => {
+    const { name, token } = req.body;
+
+    if (!name || !token) {
+        return res.json({ Success: false, Message: "Missing name or token" });
+    }
+
+    const available = await NameAvailable(name);
+
+
+});
+
+app.post('/name-available/:name', async (req, res) => {
+    const username = req.params.name;
+
+    return res.json({ Success: await NameAvailable(username), Message: "Checked if name was available" });
 });
 //#endregion
 
@@ -850,7 +886,7 @@ app.get('/api/CreateDirectMessage/:target', async (req, res) => {
 
     const sender = await accountsCollection.findOne({ _id: userId });
     const target = await accountsCollection.findOne({ Username: targetName });
-    
+
     if (sender.Username == targetName) {
         return res.json({ Success: false, Message: "I refuse to believe that you are THAT lonely." });
     }
@@ -865,7 +901,7 @@ app.get('/api/CreateDirectMessage/:target', async (req, res) => {
     if (chatExists) {
         return res.json({ Success: true, Message: "Direct messages already exists!" });
     }
-    
+
     const newRoom = {
         _id: chatId,
         Type: "Direct",
@@ -893,7 +929,7 @@ app.get('/home', async (req, res) => {
     if (credentials.Success != true) {
         return res.redirect('/login');
     }
-    
+
     return res.sendFile(path.join(__dirname, "public", "home.html"));
 });
 
@@ -908,7 +944,7 @@ app.get('/api/getCredentials', async (req, res) => {
     if (credentials.Success == true) {
         return res.json({ Success: true, User: credentials.UserId });
     }
-    
+
     return res.json({ Success: false, Message: "Unauthorized" });
 });
 
@@ -961,12 +997,12 @@ app.post('/login', async (req, res) => {
     if (!user) {
         return res.status(401).json({ message: 'Account with username not found' });
     }
-    
+
     const isPasswordValid = await bcrypt.compare(password, user.Password);
     if (!isPasswordValid) {
         return res.status(401).json({ message: 'Invalid credentials' });
     }
-    
+
     const sesssionsCollection = db.collection("Sessions");
     const token = GenerateSessionToken(user._id);
     const newSession = {
@@ -987,11 +1023,11 @@ app.post('/register', async (req, res) => {
     if (!username || !email || !password) {
         return res.status(400).json({ message: "Username and password are required" });
     }
-    
+
     try {
         const resetUrl = `${domain}/confirm-creation?token=${resetToken}`;
         const existingUser = await collection.findOne({ Username: username });
-        
+
         if (existingUser) {
             return res.status(400).json({ message: "Username already taken" });
         }
@@ -1029,7 +1065,7 @@ io.use(async (socket, next) => {
     if (credentials.Success != true) {
         return next(new Error('Unauthorized'));
     }
-    
+
     // Attach user info based on sessionId (from session storage)
     socket.userId = credentials.UserId;
     next();
@@ -1042,7 +1078,7 @@ class ConnectionHandler {
         this.UserId = socket.userId;
         this.DataBase = db;
         this.CurrentRoom = null;
-    
+
         this.Init();
     }
 
@@ -1061,7 +1097,7 @@ class ConnectionHandler {
             Socket.leave(this.CurrentRoom);
             console.log(`User (Id:${UserId}) left room: ${this.CurrentRoom}`);
         }
-        
+
         const collection = DataBase.collection("Rooms");
         const room = await collection.findOne({ _id: roomId });
 
@@ -1092,7 +1128,7 @@ class ConnectionHandler {
 
     async SendMessage(roomId, message) {
         const { Socket, UserId, Io, DataBase } = this;
-        
+
         const collection = DataBase.collection("Rooms");
         const room = await collection.findOne({ _id: roomId });
 
@@ -1122,7 +1158,7 @@ class ConnectionHandler {
             Text: message,
             Date: new Date().toISOString(), // Store time as ISO string
         };
-        
+
         // Store the message in the room's history
         console.log("update: ", room._id);
         await collection.updateOne(
