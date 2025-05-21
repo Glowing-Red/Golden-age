@@ -314,6 +314,14 @@ async function GenerateUniqueToken(length = 32, ignoreLocked = false) {
     return token;
 }
 
+function IsValidUsername(name) {
+    return (
+        typeof name === 'string' &&
+        !/\s/.test(name) &&
+        (name.match(/[a-zA-Z]/g) || []).length >= 3
+    );
+}
+
 function IsValidEmail(email) {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -567,14 +575,21 @@ async function sendPasswordResetEmail(toEmail, userName, resetToken) {
     }
 }
 
-async function NameAvailable(name) {
+async function IsUsernameAvailable(name) {
     const accountsCollection = db.collection("Accounts");
 
-    if (lockedUsernamesMap.has(name)) {
+    if (!IsValidUsername(name)) {
         return false;
     }
 
-    const exists = await accountsCollection.findOne({ Username: name });
+    if (lockedUsernamesMap.has(name.toLowerCase())) {
+        return false;
+    }
+
+    const exists = await accountsCollection.findOne({
+        Username: { $regex: `^${name}$`, $options: 'i' }
+    });
+
     if (exists) {
         return false;
     }
@@ -611,7 +626,7 @@ async function SignupAccount(email, username, password) {
         const mapData = confirmAccountMap.get(confirmToken);
 
         if (mapData && mapData.Locked == true) {
-            lockedUsernamesMap.delete(mapData.Username);
+            lockedUsernamesMap.delete(mapData.Username.toLowerCase());
         }
 
         confirmAccountMap.delete(confirmToken);
@@ -782,7 +797,9 @@ async function SignupAccount(email, username, password) {
 }
 
 (async () => {
-    const result = await SignupAccount("fraizor.youtubbe@gmail.com", "4KHax", "123K");
+    lockedUsernamesMap.set("4KHax".toLowerCase(), "banned");
+
+    const result = await SignupAccount("fraizor.youtubbe@gmail.com", "4KHax", "123456789");
     console.log("SignupAccount result:", result);
 })();
 
@@ -791,7 +808,7 @@ app.get('/registration-confirmation', async (req, res) => {
     const token = req.query.Token;
 
     function ErrorResponse(errorMsg) {
-        fs.readFile(path.join(__dirname, "public", "Links", "confirm registration.html"), 'utf8', (err, document) => {
+        fs.readFile(path.join(__dirname, "public", "Links", "CreateAccount", "document.html"), 'utf8', (err, document) => {
             if (err) {
                 return res.status(500).send('Error reading template.');
             }
@@ -822,16 +839,16 @@ app.get('/registration-confirmation', async (req, res) => {
     `;
 
     const accountsCollection = db.collection("Accounts");
-    if (lockedUsernamesMap.has(data.Username) && lockedUsernamesMap.get(data.Username) != data.Email) {
+    if (lockedUsernamesMap.has(data.Username.toLowerCase()) && lockedUsernamesMap.get(data.Username.toLowerCase()) != data.Email) {
         injectedTemplate = injectedTemplate.replace("></template>", `data-username-unavailable="true"></template>`);
     } else if (await accountsCollection.findOne({ Username: data.Username })) {
         injectedTemplate = injectedTemplate.replace("></template>", `data-username-unavailable="true"></template>`);
     } else {
-        lockedUsernamesMap.set(data.Username, data.Email);
+        lockedUsernamesMap.set(data.Username.toLowerCase(), data.Email);
         data.Locked = true;
     }
 
-    fs.readFile(path.join(__dirname, "public", "Links", "confirm registration.html"), 'utf8', (err, document) => {
+    fs.readFile(path.join(__dirname, "public", "Links", "CreateAccount", "document.html"), 'utf8', (err, document) => {
         if (err) {
             return res.status(500).send('Error reading template.');
         }
@@ -847,7 +864,7 @@ app.get('/registration-confirmation', async (req, res) => {
 
 app.post('/api/lock-registration-name', async (req, res) => {
     const { Token, Name } = req.body;
-
+    
     if (!Name || !Token) {
         return res.json({ Success: false, Message: "Missing name or token" });
     }
@@ -861,10 +878,16 @@ app.post('/api/lock-registration-name', async (req, res) => {
         return res.json({ Success: false, Message: "The username is already locked?" });
     }
 
-    const available = await NameAvailable(Name);
+    const available = await IsUsernameAvailable(Name);
     if (!available) {
         return res.json({ Success: false, Message: "Name unavailable" });
     }
+
+    lockedUsernamesMap.set(Name.toLowerCase(), data.Email);
+    data.Username = Name;
+    data.Locked = true;
+
+    return res.json({ Success: true, Message: "Locked" });
 });
 
 app.post('/api/confirm-registration', async (req, res) => {
@@ -886,20 +909,20 @@ app.post('/api/confirm-registration', async (req, res) => {
 
     const timeouts = data.Timeouts;
     const accountData = {
-        _id: GenerateUserId(),
+        _id: await GenerateUserId(),
         Date: Date.now(),
         Username: data.Username,
         Email: data.Email,
-        Display: data.Username,
-        Password: data.Password
+        Password: data.Password,
+        Display: data.Username
     };
-
+    
     timeouts.CancelAll();
     confirmAccountMap.delete(Token);
     lockedTokensSet.delete(Token);
 
-    timeouts.Create(() => {
-        lockedUsernamesMap.delete(accountData.Username);
+    setTimeout(() => {
+        lockedUsernamesMap.delete(accountData.Username.toLowerCase());
     }, (5 * 60 * 1000));
 
     const collection = db.collection("Accounts");
@@ -915,7 +938,7 @@ app.post('/api/confirm-registration', async (req, res) => {
 app.post('/name-available/:name', async (req, res) => {
     const username = req.params.name;
 
-    return res.json({ Success: await NameAvailable(username), Message: "Checked if name was available" });
+    return res.json({ Success: await IsUsernameAvailable(username), Message: "Checked if name was available" });
 });
 //#endregion
 
