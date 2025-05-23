@@ -9,7 +9,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Age of The Golden</title>
     <link rel="icon" type="image/x-icon" href="Assets/Icons/Amber Leaf.png">
-    
+
     <script src="/socket.io/socket.io.js"></script>
 </head>
 
@@ -52,13 +52,146 @@
             <div class="right">
                 <div id="messageContainer"></div>
                 <input type="text" id="messageInput" placeholder="Type your message">
+
+                <img id="myHardImage" src="">
+
+                <div>
+                    <form id="imageMessageForm">
+                        <label for="imageInput">Välj bildfil:</label>
+                        <input type="file" id="imageInput" accept="image/*">
+                        <br>
+                        <img id="previewImage" src="" alt="Bildförhandsvisning">
+                        <br>
+                        <label for="captionInput">Bildtext (valfritt):</label>
+                        <input type="text" id="captionInput" placeholder="Lägg till en bildtext...">
+                        <br>
+                        <button type="submit">Skicka bildmeddelande</button>
+                    </form>
+
+                    <div id="statusMessage"></div>
+                </div>
             </div>
         </div>
     </div>
-    
+
     <script src="Assets/Scripts/Library.js"></script>
     <script src="Assets/Scripts/Universal.js"></script>
     <script src="Assets/Scripts/Home.js"></script>
+    
+    <script>
+        // --- Hårdkodade Värden ---
+        // VIKTIGT: Dessa MÅSTE matcha ett Rums-ID och ett Bild-ID som faktiskt existerar
+        // och som din autentiserade användare har tillgång till i din databas.
+        const HARDCODED_CHAT_ID = "direct-1-2"; // Ersätt med ett verkligt rums-ID
+        const HARDCODED_GRIDFS_ID = "683063518ea26ca01a241d7b"; // Ersätt med ett verkligt bild-ID från din databas
+
+        // Konstruera URL:en för bilden med de hårdkodade ID:na
+        const imageUrl = `/image/${HARDCODED_CHAT_ID}/${HARDCODED_GRIDFS_ID}`;
+
+        // Hämta <img>-elementet
+        const imageElement = document.getElementById('myHardImage');
+
+        // Sätt src-attributet för att ladda bilden
+        imageElement.src = imageUrl;
+        imageElement.alt = `Bild i rum ${HARDCODED_CHAT_ID} med ID ${HARDCODED_GRIDFS_ID}`;
+
+        console.log(`Försöker ladda bild från URL: ${imageUrl}`);
+    </script>
+
+    <script>
+        // --- Hårdkodade Värden för Testning ---
+        // VIKTIGT: Se till att detta matchar ett befintligt Rums-ID i din databas!
+
+        // --- DOM-element ---
+        const imageMessageForm = document.getElementById('imageMessageForm');
+        const imageInput = document.getElementById('imageInput');
+        const captionInput = document.getElementById('captionInput'); // Nytt input-fält för bildtext
+        const statusMessage = document.getElementById('statusMessage');
+        const previewImage = document.getElementById('previewImage');
+
+        // --- Förhandsgranskning av bild ---
+        imageInput.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    previewImage.src = e.target.result;
+                    previewImage.style.display = 'block';
+                };
+                reader.readAsDataURL(file);
+            } else {
+                previewImage.src = '';
+                previewImage.style.display = 'none';
+            }
+        });
+
+        // --- Hantera skickande av bildmeddelande ---
+        imageMessageForm.addEventListener('submit', async (e) => {
+            e.preventDefault(); // Förhindra att sidan laddas om
+
+            statusMessage.textContent = 'Skickar bildmeddelande...';
+            statusMessage.className = 'info';
+
+            const formData = new FormData();
+            const file = imageInput.files[0];
+            const caption = captionInput.value; // Hämta bildtexten
+
+            if (!file) {
+                statusMessage.textContent = 'Vänligen välj en bildfil först.';
+                statusMessage.className = 'error';
+                return;
+            }
+
+            // Lägg till filen och andra data till FormData
+            formData.append('image', file);
+            formData.append('chatId', HARDCODED_CHAT_ID); // Hårdkodat rums-ID
+            if (caption) { // Lägg till bildtext endast om den finns
+                formData.append('caption', caption);
+            }
+
+            try {
+                const response = await fetch('/experimental/sendImageMessage', { // NY ENDPOINT!
+                    method: 'POST',
+                    body: formData // FormData skickas som 'multipart/form-data' automatiskt
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    statusMessage.textContent = `Bildmeddelande skickat framgångsrikt! Kontrollera databasen.`;
+                    statusMessage.className = 'success';
+                    // Rensa formuläret och förhandsgranskningen efter framgång
+                    imageInput.value = '';
+                    captionInput.value = ''; // Rensa bildtextfältet
+                    previewImage.src = '';
+                    previewImage.style.display = 'none';
+                } else {
+                    statusMessage.textContent = `Fel vid skickande av bildmeddelande: ${data.message || 'Okänt fel'}`;
+                    statusMessage.className = 'error';
+                }
+
+            } catch (error) {
+                console.error('Nätverksfel eller annat oväntat fel:', error);
+                statusMessage.textContent = `Nätverksfel: Kunde inte ansluta till servern eller ett oväntat fel uppstod.`;
+                statusMessage.className = 'error';
+            }
+        });
+    </script>
+
+    <style>
+        /* Enkel styling för statusmeddelanden */
+        .info {
+            color: blue;
+        }
+
+        .success {
+            color: green;
+        }
+
+        .error {
+            color: red;
+        }
+    </style>
 </body>
 
 </html>

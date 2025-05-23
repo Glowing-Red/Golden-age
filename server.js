@@ -111,8 +111,11 @@ const http = require('http');
 const socketIo = require('socket.io');
 const { parse } = require('cookie');
 const path = require("path");
-const { MongoClient } = require('mongodb');
+const { MongoClient, GridFSBucket, ObjectId } = require('mongodb');
 const fs = require("fs");
+
+const multer = require('multer');
+const sharp = require('sharp');
 
 const server = http.createServer(app);
 const io = socketIo(server);
@@ -127,13 +130,14 @@ const transporter = nodemailer.createTransport({
 });
 
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 app.use(express.static("public"));
 app.use(express.static(path.join(__dirname, "public")));
 
 const IPv4 = "10.159.152.79";
 const PORT = process.env.PORT || 3000;
-const local = true;
+const local = false;
 const domain = `http://${(local == true ? "localhost" : IPv4)}:${PORT}`;
 
 const SECRET_KEY = "Rosalith's Very Secret, Very Personal, Very Professional, Very Strong and very secure key in production.";
@@ -142,6 +146,18 @@ const uri = "mongodb://localhost:27017";
 const client = new MongoClient(uri);
 
 let db;
+const storage = multer.memoryStorage();
+const upload = multer({
+    storage: storage,
+    limits: { fileSize: 25 * 1024 * 1024 },
+    fileFilter: (req, file, cb) => {
+        if (file.mimetype.startsWith('image/')) {
+            cb(null, true);
+        } else {
+            cb(new Error('Endast bildfiler är tillåta!'), false);
+        }
+    }
+});
 
 const lockedIdsSet = new Set();
 const lockedTokensSet = new Set();
@@ -150,6 +166,7 @@ const emailCooldownSet = new Set();
 const lockedUsernamesMap = new Map();
 const confirmAccountMap = new Map();
 
+//#region database init
 async function connectToDatabase() {
     try {
         await client.connect();
@@ -169,7 +186,6 @@ const templateRooms = [
     { _id: "Golden", Type: "Group", Nickname: "Golden Hangout", Members: [1, 2], Messages: [] },
     { _id: "Peasantry", Type: "Group", Nickname: "Peasant Gathering", Messages: [] },
 ];
-//#endregion
 
 async function saveTemplates() {
     await SaveAccountsTemplate(templateAccounts);
@@ -223,6 +239,343 @@ connectToDatabase().then(async () => {
 }).catch(err => {
     console.error(err);
 });
+//#endregion
+//#endregion
+
+function generateFileHash(buffer) {
+    return crypto.createHash('sha256').update(buffer).digest('hex');
+}
+
+// 1. POST-endpoint för bilduppladdning
+app.post('/upload', upload.single('image'), async (req, res) => {
+    const cookie = req.cookies.auth_token;
+
+    if (!cookie) {
+        return res.json({ Success: false, Message: "Unauthorized" });
+    }
+
+    const credentials = await GetCredentials(cookie);
+    if (credentials.Success != true) {
+        return res.json({ Success: false, Message: "Unauthorized" });
+    }
+
+    const userId = credentials.UserId;
+
+    if (!req.file) {
+        return res.status(400).json({ message: 'Ingen fil laddades upp.' });
+    }
+
+    try {
+        const originalFileHash = generateFileHash(req.file.buffer);
+        console.log(`Mottog fil: ${req.file.originalname}, Storlek: ${req.file.size} bytes, Hash: ${originalFileHash}`);
+
+        const imageMetadataCollection = db.collection("ImageMetadata"); // Din nya samling för bildmetadata
+        const existingImage = await imageMetadataCollection.findOne({ originalFileHash: originalFileHash });
+
+        if (existingImage) {
+            console.log(`Bilden med hash ${originalFileHash} har redan laddats upp.`);
+            return res.status(200).json({
+                message: 'Bilden har redan laddats upp.',
+                metadataId: existingImage._id,
+                gridFSId: existingImage.gridFSId,
+                filename: existingImage.originalFilename
+            });
+        }
+
+        // Optimera bilden med Sharp
+        const optimizedBuffer = await sharp(req.file.buffer)
+            .resize({ width: 1200, fit: sharp.fit.inside, withoutEnlargement: true })
+            .webp({ quality: 80 })
+            .toBuffer();
+
+        const optimizedMimeType = 'image/webp';
+        const optimizedSize = optimizedBuffer.length;
+        console.log(`Bild optimerad. Ny storlek: ${optimizedSize} bytes (${(optimizedSize / 1024 / 1024).toFixed(2)} MB)`);
+
+        // Spara den optimerade bilden i GridFS
+        const bucket = new GridFSBucket(db, { bucketName: 'images' }); // Din GridFS bucket
+        const uploadStream = bucket.openUploadStream(req.file.originalname, {
+            contentType: optimizedMimeType,
+            metadata: { uploadedBy: userId } // Valfritt: lagra uppladdarens ID i GridFS metadata
+        });
+        uploadStream.end(optimizedBuffer);
+
+        await new Promise((resolve, reject) => {
+            uploadStream.on('finish', resolve);
+            uploadStream.on('error', reject);
+        });
+
+        const gridFSId = uploadStream.id; // GridFS genererar ett ObjectId för filen
+        console.log(`Bild sparad i GridFS med ID: ${gridFSId}`);
+
+        // Spara bildens metadata och GridFS-referens i din ImageMetadata-samling
+        const newImageMetadata = {
+            originalFilename: req.file.originalname,
+            optimizedMimeType: optimizedMimeType,
+            optimizedSize: optimizedSize,
+            uploadDate: new Date(),
+            originalFileHash: originalFileHash,
+            gridFSId: gridFSId, // Länkar till filen i GridFS
+            uploadedBy: userId // Kopplar bilden till användaren i din ImageMetadata-samling
+        };
+        const insertResult = await imageMetadataCollection.insertOne(newImageMetadata);
+        const metadataId = insertResult.insertedId; // ID:t för det nyskapade metadata-dokumentet
+        console.log(`Bildmetadata sparad i ImageMetadata-samling med ID: ${metadataId}`);
+
+        res.status(201).json({
+            message: 'Bilden laddades upp och optimerades framgångsrikt!',
+            metadataId: metadataId,
+            gridFSId: gridFSId,
+            filename: newImageMetadata.originalFilename
+        });
+
+    } catch (error) {
+        if (error.code === 11000) { // Dupliceringsfel från MongoDB (om hash redan finns)
+            console.warn(`Försök att ladda upp en befintlig bild (hash-duplikat): ${error.message}`);
+            return res.status(409).json({ message: 'Bilden har redan laddats upp.', error: error.message });
+        }
+
+        console.error('SERVERFEL vid bilduppladdning:', error);
+        res.status(500).json({ message: 'Ett fel uppstod vid bilduppladdning.', error: error.message });
+    }
+});
+
+// 2. GET-endpoint för att hämta bilder (med säkerhetskontroll)
+app.get('/image/:roomId/:gridFSId', async (req, res) => {
+    console.log("Image request");
+
+    try {
+        const cookie = req.cookies.auth_token;
+        const roomId = req.params.roomId;
+        
+        console.log("Image request Room Id: ", roomId);
+
+        if (!roomId) {
+            return res.json({ Success: false, Message: "no room id provided" });
+        }
+
+        if (!cookie) {
+            return res.json({ Success: false, Message: "Unauthorized" });
+        }
+
+        const credentials = await GetCredentials(cookie);
+        if (credentials.Success != true) {
+            return res.json({ Success: false, Message: "Unauthorized" });
+        }
+
+        const userId = credentials.UserId; // Användar-ID från din autentisering (numeriskt)
+
+        // --- 2. Auktorisering (anpassad för inbäddade meddelanden med MessageType) ---
+        let imageObjectId;
+        try {
+            imageObjectId = new ObjectId(req.params.gridFSId); // Konvertera strängen till ObjectId
+        } catch (e) {
+            return res.status(400).json({ message: 'Ogiltigt bild-ID-format.' });
+        }
+
+        const roomsCollection = db.collection("Rooms");
+
+        // Hitta chattrummet som innehåller ett BILDmeddelande med detta ImageId
+        const room = await roomsCollection.findOne({
+            _id: roomId, // Sök direkt på det angivna rums-ID:t
+            "Messages": {
+                $elemMatch: { // Använd $elemMatch för att matcha flera kriterier inom ett array-element
+                    "MessageType": "image", // Se till att det är ett bildmeddelande
+                    "ImageId": imageObjectId // Och att bildens ID matchar
+                }
+            }
+        });
+
+        if (!room) {
+            // Skiljer på om rummet inte hittades eller om bilden inte var i det rummet
+            const roomExists = await roomsCollection.findOne({ _id: roomId });
+
+            if (!roomExists) {
+                console.warn(`Rum ${roomId} hittades inte.`);
+                return res.status(404).send('Chattrummet hittades inte.');
+            }
+
+            console.warn(`Bild med GridFS ID ${imageObjectId} hittades inte som ett bildmeddelande i rum ${roomId}.`);
+            return res.status(404).send('Bilden hittades inte eller är inte kopplad till ett bildmeddelande i detta chattrum.');
+        }
+
+        // Kontrollera om den autentiserade användaren är deltagare i detta chattrum
+        const isParticipant = room.Members.includes(userId); // Använder .includes() för numeriska IDs
+
+        if (!isParticipant) {
+            console.warn(`Användare ${userId} försökte få åtkomst till bild ${imageObjectId} men är inte deltagare i chatt ${room._id}.`);
+            return res.status(403).send('Du har inte behörighet att se denna bild i den här chatten.');
+        }
+
+        // --- 3. Strömma bilden från GridFS (om auktorisering lyckades) ---
+        const bucket = new GridFSBucket(db, { bucketName: 'images' });
+
+        // Hämta metadata för filen från GridFS's egen files collection (för Content-Type)
+        const filesCollection = db.collection('images.files');
+        const fileInfo = await filesCollection.findOne({ _id: imageObjectId });
+
+        if (!fileInfo) {
+            console.error(`Bildfil med GridFS ID ${imageObjectId} hittades inte i GridFS.`);
+            return res.status(404).send('Bildfilen hittades inte i databasen.');
+        }
+
+        // Sätt Content-Type HTTP-header (t.ex. 'image/webp')
+        res.set('Content-Type', fileInfo.contentType || 'application/octet-stream');
+
+        // Öppna en nedladdningsström från GridFS
+        const downloadStream = bucket.openDownloadStream(imageObjectId);
+
+        downloadStream.on('error', (err) => {
+            console.error('Fel vid nedladdning av bild från GridFS:', err);
+            res.status(404).send('Ett fel uppstod vid hämtning av bilden.');
+        });
+
+        downloadStream.pipe(res); // Pipa bilddatan direkt till Express respons-strömmen
+        console.log("res!");
+    } catch (error) {
+        console.error('SERVERFEL vid bildhämtning (catch-block):', error);
+        if (error.name === 'BSONTypeError' || error.name === 'CastError') {
+            return res.status(400).json({ message: 'Ogiltigt bild-ID i begäran.' });
+        }
+        res.status(500).json({ message: 'Ett oväntat serverfel uppstod.' });
+    }
+});
+
+// Ta bort din gamla `app.post('/upload', ...)` route helt.
+// Denna nya endpoint ersätter både den och den gamla `app.post('/sendMessage', ...)` för bildmeddelanden.
+
+// Ny 3. POST-endpoint för att skicka BILDMEDDELANDEN (med inbyggd uppladdning)
+app.post('/experimental/sendImageMessage', upload.single('image'), async (req, res) => {
+    // --- 1. Autentisering ---
+    const authToken = req.cookies.auth_token;
+    const credentials = await GetCredentials(authToken); // Använder DIN GetCredentials-funktion
+    if (!credentials.Success) {
+        return res.status(401).json({ success: false, message: credentials.Message || "Unauthorized: Ogiltig autentisering." });
+    }
+    const senderId = credentials.UserId; // Användar-ID från den autentiserade sessionen
+
+    // --- 2. Validering av inkommande data och fil ---
+    const { chatId, caption } = req.body; // 'caption' är valfritt för bildmeddelanden
+
+    if (!req.file) {
+        return res.status(400).json({ message: 'Ingen bildfil laddades upp för meddelandet.' });
+    }
+    if (!chatId) {
+        return res.status(400).json({ message: 'Chatt-ID saknas för bildmeddelandet.' });
+    }
+
+    try {
+        const roomsCollection = db.collection("Rooms");
+        const room = await roomsCollection.findOne({ _id: chatId }); // Hitta chattrummet med dess ID
+
+        if (!room) {
+            return res.status(404).json({ message: `Chattrummet med ID '${chatId}' hittades inte.` });
+        }
+
+        // Kontrollera om avsändaren är medlem i det angivna chattrummet
+        if (!room.Members.includes(senderId)) {
+            return res.status(403).json({ message: 'Du är inte medlem i detta chattrum och kan inte skicka meddelanden här.' });
+        }
+
+        // --- 3. Bildoptimering och hash-generering (samma som tidigare) ---
+        const originalFileHash = generateFileHash(req.file.buffer);
+        console.log(`Mottog bild för meddelande: ${req.file.originalname}, Hash: ${originalFileHash}`);
+
+        const imageMetadataCollection = db.collection("ImageMetadata");
+        // Valfritt: Kontrollera om exakt samma bild redan finns.
+        // Om du vill spara utrymme och inte lagra dubbletter, behåll denna logik.
+        // Om varje bildmeddelande ska ha en unik GridFS-entry (även om bilden är densamma), ta bort detta block.
+        const existingImageMetadata = await imageMetadataCollection.findOne({ originalFileHash: originalFileHash });
+        if (existingImageMetadata) {
+            console.log(`Samma bild (hash) hittades redan med GridFS ID: ${existingImageMetadata.gridFSId}. Återanvänder.`);
+            // Vi använder den befintliga bildens GridFS ID
+            const gridFSId = existingImageMetadata.gridFSId;
+
+            // Skapa meddelandeobjektet och spara i rummet direkt
+            const newMessage = {
+                _id: new ObjectId(),
+                Sender: senderId,
+                Date: new Date(),
+                MessageType: "image",
+                ImageId: gridFSId,
+                Caption: (typeof caption === 'string' && caption.trim().length > 0) ? caption.trim() : undefined
+            };
+
+            await roomsCollection.updateOne(
+                { _id: chatId },
+                { $push: { Messages: newMessage } }
+            );
+
+            io.to(chatId).emit('newMessage', { roomId: chatId, message: newMessage });
+            return res.status(200).json({ success: true, message: 'Bildmeddelande skickat framgångsrikt (återanvänd bild)!', sentMessage: newMessage });
+        }
+
+
+        // Fortsätt med optimering och lagring om bilden är ny
+        const optimizedBuffer = await sharp(req.file.buffer)
+            .resize({ width: 1200, fit: sharp.fit.inside, withoutEnlargement: true })
+            .webp({ quality: 80 })
+            .toBuffer();
+
+        const optimizedMimeType = 'image/webp';
+        const optimizedSize = optimizedBuffer.length;
+        console.log(`Bild optimerad. Ny storlek: ${optimizedSize} bytes`);
+
+        // --- 4. Spara bilden i GridFS ---
+        const bucket = new GridFSBucket(db, { bucketName: 'images' });
+        const uploadStream = bucket.openUploadStream(req.file.originalname, {
+            contentType: optimizedMimeType,
+            metadata: { uploadedBy: senderId, chatId: chatId } // Lägg till chatId i GridFS metadata
+        });
+        uploadStream.end(optimizedBuffer);
+
+        await new Promise((resolve, reject) => {
+            uploadStream.on('finish', resolve);
+            uploadStream.on('error', reject);
+        });
+
+        const gridFSId = uploadStream.id; // GridFS genererar ett ObjectId för filen
+        console.log(`Ny bild sparad i GridFS med ID: ${gridFSId}`);
+
+        // Spara bildens metadata i din ImageMetadata-samling (nu med koppling till GridFS-ID)
+        const newImageMetadata = {
+            originalFilename: req.file.originalname,
+            optimizedMimeType: optimizedMimeType,
+            optimizedSize: optimizedSize,
+            uploadDate: new Date(),
+            originalFileHash: originalFileHash,
+            gridFSId: gridFSId, // Länkar till filen i GridFS
+            uploadedBy: senderId // Kopplar bilden till användaren
+        };
+        await imageMetadataCollection.insertOne(newImageMetadata); // Spara metadata
+
+        // --- 5. Konstruera och spara bildmeddelandet i chattrummet ---
+        const newMessage = {
+            _id: new ObjectId(), // Unikt ObjectId för varje meddelande
+            Sender: senderId,
+            Date: new Date(),
+            MessageType: "image",
+            ImageId: gridFSId, // Referens till den nyligen uppladdade bilden i GridFS
+            Caption: (typeof caption === 'string' && caption.trim().length > 0) ? caption.trim() : undefined
+        };
+
+        await roomsCollection.updateOne(
+            { _id: chatId },
+            { $push: { Messages: newMessage } }
+        );
+        console.log(`Nytt bildmeddelande skickat i rum '${chatId}'.`);
+
+        // --- 6. Skicka meddelandet i realtid via Socket.IO ---
+        io.to(chatId).emit('newMessage', { roomId: chatId, message: newMessage });
+
+        // --- 7. Skicka framgångsrikt svar till klienten ---
+        res.status(200).json({ success: true, message: 'Bildmeddelande skickat framgångsrikt!', sentMessage: newMessage });
+
+    } catch (error) {
+        console.error('SERVERFEL vid skickande av bildmeddelande:', error);
+        res.status(500).json({ success: false, message: 'Ett oväntat serverfel uppstod.', error: error.message });
+    }
+});
 
 function GenerateSessionToken(userId) {
     const firstRandomString = Math.random().toString(36).slice(2);
@@ -245,7 +598,7 @@ async function RemoveAllSessionTokens(userId) {
 }
 
 async function GetCredentials(cookie) {
-    console.log("Cookie:", cookie);
+    //console.log("Cookie:", cookie);
 
     if (!cookie) {
         return { Success: false, UserId: null };
@@ -796,12 +1149,12 @@ async function SignupAccount(email, username, password) {
     return false;
 }
 
-(async () => {
+/*(async () => {
     lockedUsernamesMap.set("4KHax".toLowerCase(), "banned");
 
     const result = await SignupAccount("fraizor.youtubbe@gmail.com", "4KHax", "123456789");
     console.log("SignupAccount result:", result);
-})();
+})();*/
 
 // Serve the continue registration page (must be logged in to access)
 app.get('/registration-confirmation', async (req, res) => {
@@ -864,7 +1217,7 @@ app.get('/registration-confirmation', async (req, res) => {
 
 app.post('/api/lock-registration-name', async (req, res) => {
     const { Token, Name } = req.body;
-    
+
     if (!Name || !Token) {
         return res.json({ Success: false, Message: "Missing name or token" });
     }
@@ -916,7 +1269,7 @@ app.post('/api/confirm-registration', async (req, res) => {
         Password: data.Password,
         Display: data.Username
     };
-    
+
     timeouts.CancelAll();
     confirmAccountMap.delete(Token);
     lockedTokensSet.delete(Token);
