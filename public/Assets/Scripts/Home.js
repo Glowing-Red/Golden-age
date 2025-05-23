@@ -63,48 +63,50 @@ async function DisplayMessage(data) {
     }
 }
 
-socket.on('errorMessage', (message) => {
-    alert(message);
-});
+function InitSocket() {
+    socket.on('errorMessage', (message) => {
+        alert(message);
+    });
 
-socket.on('roomJoined', (data) => {
-    currentRoom = data[0];
-    //alert(data[1]);
+    socket.on('roomJoined', (data) => {
+        currentRoom = data[0];
+        //alert(data[1]);
 
-    document.getElementById('messageInput').style.display = 'block';
-});
+        document.getElementById('messageInput').style.display = 'block';
+    });
 
-socket.on('receiveMessage', async (data) => {
-    console.log("receivem esssage", data);
-    
-    DisplayMessage(data);
-});
+    socket.on('receiveMessage', async (data) => {
+        console.log("receivem esssage", data);
 
-socket.on('chatHistory', async (history) => {
-    console.log("receivem chatHistory", history);
-    
-    cache.Users = {};
-    
-    const tempSet = new Set();
-    for (let i = 0; i < history.length; i++) {
-        tempSet.add(history[i].Sender)
-    }
+        DisplayMessage(data);
+    });
 
-    const userIds = Array.from(tempSet);
-    const userInfos = await FetchUserInfo(userIds);
-    
-    for (let i = 0; i < userInfos; i++) {
-        const info = userInfos[i];
+    socket.on('chatHistory', async (history) => {
+        console.log("receivem chatHistory", history);
 
-        cache.Users[info.Id] = info;
-    }
+        cache.Users = {};
 
-    for (let i = 0; i < history.length; i++) {
-        const data = history[i];
-        
-        await DisplayMessage(data);
-    }
-});
+        const tempSet = new Set();
+        for (let i = 0; i < history.length; i++) {
+            tempSet.add(history[i].Sender)
+        }
+
+        const userIds = Array.from(tempSet);
+        const userInfos = await FetchUserInfo(userIds);
+
+        for (let i = 0; i < userInfos; i++) {
+            const info = userInfos[i];
+
+            cache.Users[info.Id] = info;
+        }
+
+        for (let i = 0; i < history.length; i++) {
+            const data = history[i];
+
+            await DisplayMessage(data);
+        }
+    });
+}
 
 function joinRoom(roomId) {
     currentRoom = null;
@@ -266,8 +268,9 @@ async function Setup() {
 
     if(data.Success === true) {
         socket = io();
+        InitSocket();
+        
         cache.UserId = data.User;
-
         DisplayAccount(data.User);
 
         if (data.User === 2) {
