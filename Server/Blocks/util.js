@@ -1,10 +1,11 @@
 const ReBlock = global.ReBlock;
+
 ReBlock.CreateBlock("Utilities", class Block_Utilities {
-    static Level = 10;
-    static Order = 10;
+    Level = 10;
+    Order = 10;
+    RejectCycle = false;
 
     #Block = undefined;
-    RejectCycle = false;
 
     constructor(block) {
         this.#Block = block;

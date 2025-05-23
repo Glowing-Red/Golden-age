@@ -8,5 +8,5 @@ require("./Blocks/util.js");
 
 const ReBlock = global.ReBlock;
 ReBlock.Start().then(() => {
-    console.warn("[ReBlock] All Services finished their cycle.");
+    console.warn("[ReBlock] All blocks finished their cycle.");
 });

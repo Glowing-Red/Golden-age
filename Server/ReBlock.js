@@ -20,7 +20,7 @@ global.ReBlock = new class ReBlock {
         return newClass;
     }
 
-    GetBlock(name) {
+    GetRawBlock(name) {
         const Blocks = this.#Blocks;
         const lower = name.toLowerCase();
 
@@ -31,8 +31,8 @@ global.ReBlock = new class ReBlock {
         return Blocks[lower];
     }
 
-    GetBlockClass(name) {
-        const block = this.GetBlock(name);
+    GetBlock(name) {
+        const block = this.GetRawBlock(name);
 
         if (block) {
             return block.Class;

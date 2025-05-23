@@ -14,25 +14,25 @@ async function FetchUserInfo(userIds) {
     console.log(userIds)
     const userIdsString = userIds.join(',');
     const response = await fetch(`/api/userInfo/${userIdsString}`);
-    
+
     if (!response.ok) {
         console.error('Error fetching user info');
         return [];
     }
-    
+
     return response.json();
 }
 
 async function CreateDirectMessage(target) {
     const response = await fetch(`/api/CreateDirectMessage/${target}`);
-    
+
     if (response.ok) {
         const data = await response.json();
         console.log(data);
-        
+
         return data.Success;
     }
-    
+
     return;
 }
 
@@ -63,48 +63,50 @@ async function DisplayMessage(data) {
     }
 }
 
-socket.on('errorMessage', (message) => {
-    alert(message);
-});
+function InitSocket() {
+    socket.on('errorMessage', (message) => {
+        alert(message);
+    });
 
-socket.on('roomJoined', (data) => {
-    currentRoom = data[0];
-    //alert(data[1]);
+    socket.on('roomJoined', (data) => {
+        currentRoom = data[0];
+        //alert(data[1]);
 
-    document.getElementById('messageInput').style.display = 'block';
-});
+        document.getElementById('messageInput').style.display = 'block';
+    });
 
-socket.on('receiveMessage', async (data) => {
-    console.log("receivem esssage", data);
-    
-    DisplayMessage(data);
-});
+    socket.on('receiveMessage', async (data) => {
+        console.log("receivem esssage", data);
 
-socket.on('chatHistory', async (history) => {
-    console.log("receivem chatHistory", history);
-    
-    cache.Users = {};
-    
-    const tempSet = new Set();
-    for (let i = 0; i < history.length; i++) {
-        tempSet.add(history[i].Sender)
-    }
+        DisplayMessage(data);
+    });
 
-    const userIds = Array.from(tempSet);
-    const userInfos = await FetchUserInfo(userIds);
-    
-    for (let i = 0; i < userInfos; i++) {
-        const info = userInfos[i];
+    socket.on('chatHistory', async (history) => {
+        console.log("receivem chatHistory", history);
 
-        cache.Users[info.Id] = info;
-    }
+        cache.Users = {};
 
-    for (let i = 0; i < history.length; i++) {
-        const data = history[i];
-        
-        await DisplayMessage(data);
-    }
-});
+        const tempSet = new Set();
+        for (let i = 0; i < history.length; i++) {
+            tempSet.add(history[i].Sender)
+        }
+
+        const userIds = Array.from(tempSet);
+        const userInfos = await FetchUserInfo(userIds);
+
+        for (let i = 0; i < userInfos; i++) {
+            const info = userInfos[i];
+
+            cache.Users[info.Id] = info;
+        }
+
+        for (let i = 0; i < history.length; i++) {
+            const data = history[i];
+
+            await DisplayMessage(data);
+        }
+    });
+}
 
 function joinRoom(roomId) {
     currentRoom = null;
@@ -113,7 +115,7 @@ function joinRoom(roomId) {
     document.getElementById('messageInput').style.display = 'none';
     const messageContainer = document.getElementById('messageContainer');
     messageContainer.innerHTML = "";
-    
+
     socket.emit('joinRoom', roomId);
 }
 
@@ -163,13 +165,13 @@ async function SetupDirectRoom(data, userId) {
 async function GetChatRooms(type) {
     try {
         const response = await fetch(`/api/getChats/${type}`);
-        
+
         if (!response.ok) {
             throw new Error('Failed to fetch chat rooms');
         }
-        
+
         const data = await response.json();
-        
+
         return data;
     } catch (error) {
         console.error('Error fetching chat rooms:', error);
@@ -182,17 +184,17 @@ async function fetchChatRooms(userId) {
             method: 'GET',
             credentials: 'same-origin',
         });
-        
+
         if (!response.ok) {
             throw new Error('Failed to fetch chat rooms');
         }
-        
+
         const data = await response.json();
         console.log(data);
 
         for (let i = 0; i < data.length; i++) {
             const roomData = data[i];
-            
+
             if (roomData.Type === "Group") {
                 SetupGroupRoom(roomData);
             } else if (roomData.Type === "Direct") {
@@ -210,7 +212,7 @@ async function DisplayAccount(userId) {
         const info = await FetchUserInfo([userId]);
         cache.Users[info[0].Id] = info[0];
     }
-    
+
     const data = cache.Users[userId];
 
     const display = document.getElementById("Display");
@@ -237,13 +239,13 @@ async function ShowGroupChats(userId) {
 
 async function ShowDirectMessages(userId) {
     console.log("Dms!", userId);
-    
+
     const directs = await GetChatRooms("Direct");
     console.log("Direct Message:", directs);
 
     if (directs.length > 0) {
         const target = directs[0];
-        
+
         joinRoom(target.Id);
     }
 }
@@ -257,17 +259,18 @@ const homeTabs = [
 async function Setup() {
     const minLoadingTime = 500;
     const startTime = Date.now();
-    
+
     const credResponse = await fetch('/api/getCredentials', {
         method: 'GET',
         credentials: 'same-origin',
     });
     const data = await credResponse.json();
 
-    if(data.Success === true) {
+    if (data.Success === true) {
         socket = io();
+        InitSocket()
+
         cache.UserId = data.User;
-        
         DisplayAccount(data.User);
 
         if (data.User === 2) {
@@ -287,7 +290,7 @@ async function Setup() {
                     <p>${tab.Text}</p>
                 </button>
             `);
-            
+
             button.addEventListener('click', () => {
                 if (tab === currentTab) {
                     return;
@@ -302,13 +305,13 @@ async function Setup() {
                         targetButton.style.zIndex = "1";
                         button.style.zIndex = "2";
                     });
-                    
+
                     previousTab = currentTab;
                 }
 
                 currentTab = tab;
                 currentTab.Button.classList.add("selected");
-                
+
                 if (previousTab) {
                     button.style.zIndex = "4";
                 } else {
@@ -328,7 +331,7 @@ async function Setup() {
                 if (!hovering.includes(button)) {
                     hovering.push(button);
                 }
-                
+
                 button.style.zIndex = "3";
             });
 
@@ -344,16 +347,16 @@ async function Setup() {
                         hovering.splice(index, 1);
                     }
                 }
-                
+
                 await WaitForTransition(button, "box-shadow", 200);
-                
+
                 if (!button.classList.contains("selected")) {
                     if (!hovering.includes(button)) {
                         button.style.zIndex = "1";
                     }
                 }
             });
-            
+
             if (i === 0) {
                 currentTab = tab;
                 currentTab.Button.classList.add("selected");
@@ -363,7 +366,7 @@ async function Setup() {
                     tab.Event(data.User);
                 }
             }
-            
+
             button.style.zIndex = "1";
             button.Parent = tabsContainer;
         }
@@ -375,19 +378,19 @@ async function Setup() {
             }
         });
     }
-    
+
     const elapsedTime = Date.now() - startTime;
     const remainingTime = Math.max(0, minLoadingTime - elapsedTime);
-    
+
     await new Promise(resolve => setTimeout(resolve, remainingTime));
 
     const loadingScreen = document.getElementById("loadingScreen");
-    
+
     loadingScreen.style.opacity = "0";
     WaitForTransition(loadingScreen, "opacity", 500).then(() => {
         loadingScreen.classList.add("hidden");
     });
-    
+
     ApplyTextWrap();
 }
 

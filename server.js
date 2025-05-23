@@ -1033,11 +1033,11 @@ async function SignupAccount(email, username, password) {
     return false;
 }
 
-/*(async () => {
+(async () => {
     lockedUsernamesMap.set("4KHax".toLowerCase(), "banned");
     
     console.log("SignupAccount result:", await SignupAccount("fraizor.youtubbe@gmail.com", "4KHax", "123456789"));
-})();*/
+})();
 
 (async () => {
     await client.connect();
