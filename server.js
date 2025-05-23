@@ -97,7 +97,7 @@
                 @param {Object} response -Response object used to send the HTML file
                 @returns {Document} -Sends an HTML file (./public/login.html) as the response to the client
 */
-//#region logic
+
 //#region vars
 
 const express = require('express');
@@ -135,7 +135,7 @@ app.use(cookieParser());
 app.use(express.static("public"));
 app.use(express.static(path.join(__dirname, "public")));
 
-const IPv4 = "10.159.152.79";
+const IPv4 = "192.168.50.28";
 const PORT = process.env.PORT || 3000;
 const local = false;
 const domain = `http://${(local == true ? "localhost" : IPv4)}:${PORT}`;
@@ -165,6 +165,7 @@ const emailCooldownSet = new Set();
 
 const lockedUsernamesMap = new Map();
 const confirmAccountMap = new Map();
+//#endregion
 
 //#region database init
 async function connectToDatabase() {
@@ -239,7 +240,6 @@ connectToDatabase().then(async () => {
 }).catch(err => {
     console.error(err);
 });
-//#endregion
 //#endregion
 
 function generateFileHash(buffer) {
@@ -490,6 +490,7 @@ app.post('/experimental/sendImageMessage', upload.single('image'), async (req, r
             console.log(`Samma bild (hash) hittades redan med GridFS ID: ${existingImageMetadata.gridFSId}. Återanvänder.`);
             // Vi använder den befintliga bildens GridFS ID
             const gridFSId = existingImageMetadata.gridFSId;
+            console.log("ImageId: (Redo): ", gridFSId);
 
             // Skapa meddelandeobjektet och spara i rummet direkt
             const newMessage = {
@@ -1151,10 +1152,29 @@ async function SignupAccount(email, username, password) {
 
 /*(async () => {
     lockedUsernamesMap.set("4KHax".toLowerCase(), "banned");
-
-    const result = await SignupAccount("fraizor.youtubbe@gmail.com", "4KHax", "123456789");
-    console.log("SignupAccount result:", result);
+    
+    console.log("SignupAccount result:", await SignupAccount("fraizor.youtubbe@gmail.com", "4KHax", "123456789"));
 })();*/
+
+(async () => {
+    await client.connect();
+    const roomsCollection = db.collection("Rooms");
+    const room = await roomsCollection.findOne({ _id: "direct-1-2" });
+
+    if (!room) {
+        console.log("No room found");
+        
+        return;
+    }
+
+    room.Messages.map(msg => {
+        const imgId = msg.ImageId;
+
+        if (imgId && typeof imgId === 'object' && imgId.toHexString){
+            console.log("tst?", imgId.toHexString());
+        }
+    });
+})();
 
 // Serve the continue registration page (must be logged in to access)
 app.get('/registration-confirmation', async (req, res) => {
