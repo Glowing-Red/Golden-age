@@ -28,7 +28,17 @@ global.ReBlock = new class ReBlock {
             throw new Error(`There is no block with the "${name}" that exists.`);
         }
 
-        return Blocks[lower].Class;
+        return Blocks[lower];
+    }
+
+    GetBlockClass(name) {
+        const block = this.GetBlock(name);
+
+        if (block) {
+            return block.Class;
+        }
+
+        return null;
     }
 
     async Start() {
