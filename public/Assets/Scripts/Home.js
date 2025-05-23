@@ -1,4 +1,4 @@
-const socket = io();
+let socket;
 let currentRoom = null;
 let previousMessageSender = null;
 
@@ -265,7 +265,9 @@ async function Setup() {
     const data = await credResponse.json();
 
     if(data.Success === true) {
+        socket = io();
         cache.UserId = data.User;
+
         DisplayAccount(data.User);
 
         if (data.User === 2) {
