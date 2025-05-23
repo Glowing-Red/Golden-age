@@ -330,7 +330,7 @@ app.get('/image/:roomId/:gridFSId', async (req, res) => {
         console.log("res!");
     } catch (error) {
         console.error('SERVERFEL vid bildhämtning (catch-block):', error);
-        
+
         if (error.name === 'BSONTypeError' || error.name === 'CastError') {
             return res.status(400).json({ message: 'Ogiltigt bild-ID i begäran.' });
         }
@@ -343,11 +343,12 @@ app.get('/image/:roomId/:gridFSId', async (req, res) => {
 app.post('/experimental/sendImageMessage', upload.single('image'), async (req, res) => {
     const authToken = req.cookies.auth_token;
     const credentials = await GetCredentials(authToken);
+
     if (!credentials.Success) {
         return res.status(401).json({ success: false, message: credentials.Message || "Unauthorized: Ogiltig autentisering." });
     }
+
     const senderId = credentials.UserId;
-    
     const { chatId, caption } = req.body;
 
     if (!req.file) {
@@ -449,7 +450,7 @@ app.post('/experimental/sendImageMessage', upload.single('image'), async (req, r
             { _id: chatId },
             { $push: { Messages: newMessage } }
         );
-
+        
         console.log(`Nytt bildmeddelande skickat i rum '${chatId}'.`);
         io.to(chatId).emit('newMessage', { roomId: chatId, message: newMessage });
         
