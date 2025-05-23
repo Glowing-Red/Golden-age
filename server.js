@@ -242,7 +242,7 @@ connectToDatabase().then(async () => {
 });
 //#endregion
 
-function generateFileHash(buffer) {
+function GenerateHash256(buffer) {
     return crypto.createHash('sha256').update(buffer).digest('hex');
 }
 
@@ -370,7 +370,7 @@ app.post('/experimental/sendImageMessage', upload.single('image'), async (req, r
             return res.status(403).json({ message: 'Du är inte medlem i detta chattrum och kan inte skicka meddelanden här.' });
         }
         
-        const originalFileHash = generateFileHash(req.file.buffer);
+        const originalFileHash = GenerateHash256(req.file.buffer);
         console.log(`Mottog bild för meddelande: ${req.file.originalname}, Hash: ${originalFileHash}`);
 
         const imageMetadataCollection = db.collection("ImageMetadata");
