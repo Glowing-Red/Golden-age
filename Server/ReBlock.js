@@ -1,9 +1,14 @@
 global.ReBlock = new class ReBlock {
+    #Started = false;
     #Blocks = {};
 
     constructor() { }
 
     CreateBlock(blockName, blockClass) {
+        if (this.#Started == true) {
+            throw new Error(`[Server] ReBlock: Cannot create blocks after the lifecycle has started.`);
+        }
+
         const Blocks = this.#Blocks;
         const lower = blockName.toLowerCase();
 
@@ -42,19 +47,38 @@ global.ReBlock = new class ReBlock {
     }
 
     async Start() {
-        const Blocks = this.#Blocks;
+        if (this.#Started != false) {
+            throw new Error(`[Server] ReBlock lifecycle already started!`);
+        }
+
+        this.#Started = true;
         const Promises = {}
 
-        console.warn("[Server] ReBlock Started!");
+        const Blocks = this.#Blocks;
+        const sortedKeys = Object.keys(Blocks)
+            .filter((key) => Blocks[key].RejectCycle !== true)
+            .sort((a, b) => {
+                const blockA = Blocks[a];
+                const blockB = Blocks[b];
 
-        Promises.Start = Object.keys(Blocks).map((key) => {
+                if (blockB.Level !== blockA.Level) {
+                    return blockB.Level - blockA.Level;
+                }
+
+                return blockA.Order - blockB.Order;
+            }
+        );
+        
+        console.warn("[Server] ReBlock: Started!");
+        
+        Promises.Start = sortedKeys.map((key) => {
             const block = Blocks[key];
-
-            if (typeof block.Class.Start === "function" && block.Class.RejectCycle !== true) {
+            
+            if (typeof block.Class.Start === "function") {
                 return Promise.resolve()
                     .then(() => block.Class.Start())
                     .catch((err) => {
-                        console.error(`Error in block "${block.Name}" Start():`, err);
+                        console.error(`[Server] ReBlock: Error in block "${block.Name}".Start():`, err);
 
                         throw err;
                     });
@@ -66,17 +90,17 @@ global.ReBlock = new class ReBlock {
         try {
             await Promise.all(Promises.Start);
         } catch (err) {
-            throw new Error("ReBlock.Start() failed due to Blocks.Start() error.");
+            throw new Error("[Server] ReBlock.Start(): Failed due to Block.Start() error.");
         }
 
-        Promises.Init = Object.keys(Blocks).map((key) => {
+        Promises.Init = sortedKeys.map((key) => {
             const block = Blocks[key];
 
-            if (typeof block.Class.Init === "function" && block.Class.RejectCycle !== true) {
+            if (typeof block.Class.Init === "function") {
                 return Promise.resolve()
                     .then(() => block.Class.Init())
                     .catch((err) => {
-                        console.error(`Error in block "${block.Name}" Init():`, err);
+                        console.error(`[Server] ReBlock: Error in block "${block.Name}".Init():`, err);
 
                         throw err;
                     });
@@ -88,7 +112,7 @@ global.ReBlock = new class ReBlock {
         try {
             await Promise.all(Promises.Init);
         } catch (err) {
-            throw new Error("ReBlock.Start() failed due to Blocks.Init() error.");
+            throw new Error("[Server] ReBlock.Start(): Failed due to Block.Init() error.");
         }
     }
 }();

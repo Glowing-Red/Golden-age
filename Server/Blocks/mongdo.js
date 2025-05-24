@@ -1,22 +1,19 @@
 const ReBlock = global.ReBlock;
 
-ReBlock.CreateBlock("Utilities", class Block_Utilities {
+ReBlock.CreateBlock("Database", class Block_Utilities {
     #Block = undefined;
-    #RejectCycle = true;
-    #Level = 4;
-    #Order = 2;
+    #Level = 5;
+    #Order = 1;
 
     constructor(block) {
         this.#Block = block;
 
-        block.RejectCycle = this.#RejectCycle;
         block.Level = this.#Level;
         block.Order = this.#Order;
     }
 
     Start() {
         const Vars = global.Vars;
-        Vars.SECRET_KEY = "Secret Test";
 
         console.log("Run " + this.#Block.Name);
     }
