@@ -179,8 +179,8 @@ async function connectToDatabase() {
 }
 
 const templateAccounts = [
-    { _id: 1, Date: new Date().toISOString(), Username: "f", Display: "Owner", Password: "f" },
-    { _id: 2, Date: new Date().toISOString(), Username: "a", Display: "Admin", Password: "a", Membership: "Golden" }
+    { _id: 1, Date: new Date(), Username: "f", Display: "Owner", Password: "f" },
+    { _id: 2, Date: new Date(), Username: "a", Display: "Admin", Password: "a", Membership: "Golden" }
 ];
 
 const templateRooms = [
@@ -200,7 +200,7 @@ async function SaveAccountsTemplate(params) {
     for (let i = 0; i < params.length; i++) {
         const targetUser = params[i];
         const existingUser = await collection.findOne({ _id: targetUser._id });
-
+        
         if (!existingUser) {
             targetUser.Password = await bcrypt.hash(targetUser.Password, 10);
 

@@ -1,9 +1,10 @@
 const ReBlock = global.ReBlock;
+const Vars = ReBlock.GetVariables();
 
 ReBlock.CreateBlock("Template", class Block_Utilities {
     #Block = undefined;
     #Level = 5;
-    #Order = 1;
+    #Order = 2;
 
     constructor(block) {
         this.#Block = block;
@@ -13,8 +14,6 @@ ReBlock.CreateBlock("Template", class Block_Utilities {
     }
 
     Start() {
-        const Vars = global.Vars;
-
         console.log("Run " + this.#Block.Name);
     }
 });

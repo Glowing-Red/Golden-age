@@ -1,4 +1,5 @@
 const ReBlock = global.ReBlock;
+const Vars = ReBlock.GetVariables();
 
 ReBlock.CreateBlock("Utilities", class Block_Utilities {
     #Block = undefined;
@@ -14,10 +15,8 @@ ReBlock.CreateBlock("Utilities", class Block_Utilities {
         block.Order = this.#Order;
     }
 
-    Start() {
-        const Vars = global.Vars;
-        Vars.SECRET_KEY = "Secret Test";
-
-        console.log("Run " + this.#Block.Name);
+    Run() {
+        console.log("Util: ", Vars.TstString);
+        console.log(Date.now())
     }
 });

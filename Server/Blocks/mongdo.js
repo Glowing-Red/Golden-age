@@ -1,4 +1,5 @@
 const ReBlock = global.ReBlock;
+const Vars = ReBlock.GetVariables();
 
 ReBlock.CreateBlock("Database", class Block_Utilities {
     #Block = undefined;
@@ -7,13 +8,13 @@ ReBlock.CreateBlock("Database", class Block_Utilities {
 
     constructor(block) {
         this.#Block = block;
-
+        
         block.Level = this.#Level;
         block.Order = this.#Order;
     }
 
     Start() {
-        const Vars = global.Vars;
+        Vars.TstString = "Hello";
 
         console.log("Run " + this.#Block.Name);
     }

@@ -1,6 +1,7 @@
 global.ReBlock = new class ReBlock {
     #Started = false;
     #Blocks = {};
+    #Vars = {};
 
     constructor() { }
 
@@ -46,7 +47,68 @@ global.ReBlock = new class ReBlock {
         return null;
     }
 
-    async Start() {
+    GetVariables() {
+        return this.#Vars;
+    }
+
+    #Wait(milliseconds) {
+        return new Promise(resolve => setTimeout(resolve, milliseconds));
+    }
+
+    async SequentialStart() {
+        if (this.#Started != false) {
+            throw new Error(`[Server] ReBlock lifecycle already started!`);
+        }
+
+        this.#Started = true;
+        const Blocks = this.#Blocks;
+        const sortedKeys = Object.keys(Blocks)
+            .filter((key) => Blocks[key].RejectCycle !== true)
+            .sort((a, b) => {
+                const blockA = Blocks[a];
+                const blockB = Blocks[b];
+
+                if (blockB.Level !== blockA.Level) {
+                    return blockB.Level - blockA.Level;
+                }
+
+                return blockA.Order - blockB.Order;
+            });
+
+        console.warn("[Server](Sequential) ReBlock: Started!");
+
+        for (const key of sortedKeys) {
+            const block = Blocks[key];
+
+            if (typeof block.Class.Start === "function") {
+                try {
+                    await block.Class.Start();
+                } catch (err) {
+                    console.error(`[Server] ReBlock: Error in block "${block.Name}".Start():`, err);
+
+                    throw new Error("[Server] ReBlock.Start(): Failed due to Block.Start() error.");
+                }
+            }
+        }
+
+        for (const key of sortedKeys) {
+            const block = Blocks[key];
+
+            if (typeof block.Class.Init === "function") {
+                try {
+                    await block.Class.Init();
+                } catch (err) {
+                    console.error(`[Server] ReBlock: Error in block "${block.Name}".Init():`, err);
+
+                    throw new Error("[Server] ReBlock.Init(): Failed due to Block.Init() error.");
+                }
+            }
+        }
+
+        return 1;
+    }
+
+    async ParallelStart() {
         if (this.#Started != false) {
             throw new Error(`[Server] ReBlock lifecycle already started!`);
         }
@@ -67,13 +129,13 @@ global.ReBlock = new class ReBlock {
 
                 return blockA.Order - blockB.Order;
             }
-        );
-        
-        console.warn("[Server] ReBlock: Started!");
-        
+            );
+
+        console.warn("[Server](Parallel) ReBlock: Started!");
+
         Promises.Start = sortedKeys.map((key) => {
             const block = Blocks[key];
-            
+
             if (typeof block.Class.Start === "function") {
                 return Promise.resolve()
                     .then(() => block.Class.Start())
@@ -114,5 +176,7 @@ global.ReBlock = new class ReBlock {
         } catch (err) {
             throw new Error("[Server] ReBlock.Start(): Failed due to Block.Init() error.");
         }
+
+        return 2;
     }
 }();
