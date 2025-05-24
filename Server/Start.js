@@ -1,20 +1,27 @@
 // Importing ReBlock
 require("./ReBlock.js");
 
-// Variables
 const ReBlock = global.ReBlock;
 const Vars = ReBlock.GetVariables();
 
-Vars.SECRET_KEY = "Rosalith's Very Secret, Very Personal, Very Professional, Very Strong and very secure key in production.";
-
-// Importing Level 5 Blocks
-require("./Blocks/mongdo.js");
+// Importing Blocks
 require("./Blocks/templtae.js");
-
-// Importing Level 4 Blocks
 require("./Blocks/test.js");
-require("./Blocks/util.js");
+require("./Blocks/Utilities.js");
+require("./Blocks/Variables/Important.js");
+require("./Blocks/Database/MongoDB.js");
 
 ReBlock.SequentialStart().then(() => {
     console.warn("[Server](SequentialStart) ReBlock: All blocks finished their cycle.");
+
+    const PORT = Vars.PORT; 
+    const domain = Vars.Domain;
+    const server = Vars.Server;
+
+    server.listen(PORT, () => {
+        console.log(`Server running on ${domain}/home`);
+    });
+}).catch(err => {
+    console.error("Failed to start ReBlock cycle or server:", err);
+    process.exit(1);
 });

@@ -1,0 +1,144 @@
+const ReBlock = global.ReBlock;
+const Vars = ReBlock.GetVariables();
+
+ReBlock.CreateBlock(ReBlock.GenerateName(), class {
+    #Block = undefined;
+
+    #Level = 30;
+    #Order = 2;
+
+    #Route = "send-image-message:roomId/:gridFSId";
+    constructor(block) {
+        this.#Block = block;
+
+        block.Level = this.#Level;
+        block.Order = this.#Order;
+    }
+
+    async #PostEndpoint(req, res) {
+        const authToken = req.cookies.auth_token;
+        const credentials = await GetCredentials(authToken);
+
+        if (!credentials.Success) {
+            return res.status(401).json({ success: false, message: credentials.Message || "Unauthorized: Ogiltig autentisering." });
+        }
+
+        const senderId = credentials.UserId;
+        const { chatId, caption } = req.body;
+
+        if (!req.file) {
+            return res.status(400).json({ message: 'Ingen bildfil laddades upp för meddelandet.' });
+        }
+        if (!chatId) {
+            return res.status(400).json({ message: 'Chatt-ID saknas för bildmeddelandet.' });
+        }
+
+        try {
+            const roomsCollection = db.collection("Rooms");
+            const room = await roomsCollection.findOne({ _id: chatId });
+
+            if (!room) {
+                return res.status(404).json({ message: `Chattrummet med ID '${chatId}' hittades inte.` });
+            }
+
+            if (!room.Members.includes(senderId)) {
+                return res.status(403).json({ message: 'Du är inte medlem i detta chattrum och kan inte skicka meddelanden här.' });
+            }
+
+            const originalFileHash = GenerateHash256(req.file.buffer);
+            console.log(`Mottog bild för meddelande: ${req.file.originalname}, Hash: ${originalFileHash}`);
+
+            const imageMetadataCollection = db.collection("ImageMetadata");
+            const existingImageMetadata = await imageMetadataCollection.findOne({ originalFileHash: originalFileHash });
+
+            if (existingImageMetadata) {
+                console.log(`Samma bild (hash) hittades redan med GridFS ID: ${existingImageMetadata.gridFSId}. Återanvänder.`);
+
+                const gridFSId = existingImageMetadata.gridFSId;
+                console.log("ImageId: (Redo): ", gridFSId);
+
+                const newMessage = {
+                    _id: new ObjectId(),
+                    Sender: senderId,
+                    Date: new Date(),
+                    MessageType: "image",
+                    ImageId: gridFSId,
+                    Caption: (typeof caption === 'string' && caption.trim().length > 0) ? caption.trim() : undefined
+                };
+
+                await roomsCollection.updateOne(
+                    { _id: chatId },
+                    { $push: { Messages: newMessage } }
+                );
+
+                io.to(chatId).emit('newMessage', { roomId: chatId, message: newMessage });
+
+                return res.status(200).json({ success: true, message: 'Bildmeddelande skickat framgångsrikt (återanvänd bild)!', sentMessage: newMessage });
+            }
+
+            const optimizedBuffer = await sharp(req.file.buffer)
+                .resize({ width: 1200, fit: sharp.fit.inside, withoutEnlargement: true })
+                .webp({ quality: 80 })
+                .toBuffer();
+
+            const optimizedMimeType = 'image/webp';
+            const optimizedSize = optimizedBuffer.length;
+            console.log(`Bild optimerad. Ny storlek: ${optimizedSize} bytes`);
+
+            const bucket = Vars.GridFS.Images;
+            const uploadStream = bucket.openUploadStream(req.file.originalname, {
+                contentType: optimizedMimeType,
+                metadata: { uploadedBy: senderId, chatId: chatId }
+            });
+
+            uploadStream.end(optimizedBuffer);
+            await new Promise((resolve, reject) => {
+                uploadStream.on('finish', resolve);
+                uploadStream.on('error', reject);
+            });
+
+            const gridFSId = uploadStream.id;
+            console.log(`Ny bild sparad i GridFS med ID: ${gridFSId}`);
+
+            const newImageMetadata = {
+                originalFilename: req.file.originalname,
+                optimizedMimeType: optimizedMimeType,
+                optimizedSize: optimizedSize,
+                uploadDate: new Date(),
+                originalFileHash: originalFileHash,
+                gridFSId: gridFSId,
+                uploadedBy: senderId
+            };
+
+            await imageMetadataCollection.insertOne(newImageMetadata);
+
+            const newMessage = {
+                _id: new ObjectId(),
+                Sender: senderId,
+                Date: new Date(),
+                MessageType: "image",
+                ImageId: gridFSId,
+                Caption: (typeof caption === 'string' && caption.trim().length > 0) ? caption.trim() : undefined
+            };
+
+            await roomsCollection.updateOne(
+                { _id: chatId },
+                { $push: { Messages: newMessage } }
+            );
+
+            console.log(`Nytt bildmeddelande skickat i rum '${chatId}'.`);
+            io.to(chatId).emit('newMessage', { roomId: chatId, message: newMessage });
+
+            res.status(200).json({ success: true, message: 'Bildmeddelande skickat framgångsrikt!', sentMessage: newMessage });
+        } catch (error) {
+            console.error('SERVERFEL vid skickande av bildmeddelande:', error);
+            res.status(500).json({ success: false, message: 'Ett oväntat serverfel uppstod.', error: error.message });
+        }
+    }
+
+    Init() {
+        const { App, Upload } = Vars;
+
+        App.get(`/api/${this.#Route}`, Upload.single("image"), this.#PostEndpoint);
+    }
+});

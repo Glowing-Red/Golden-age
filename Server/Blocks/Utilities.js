@@ -1,11 +1,11 @@
 const ReBlock = global.ReBlock;
 const Vars = ReBlock.GetVariables();
 
-ReBlock.CreateBlock("Utilities", class Block_Utilities {
+ReBlock.CreateBlock("Utilities", class {
     #Block = undefined;
     #RejectCycle = true;
-    #Level = 4;
-    #Order = 2;
+    #Level = 90;
+    #Order = 1;
 
     constructor(block) {
         this.#Block = block;
@@ -13,6 +13,12 @@ ReBlock.CreateBlock("Utilities", class Block_Utilities {
         block.RejectCycle = this.#RejectCycle;
         block.Level = this.#Level;
         block.Order = this.#Order;
+
+        Vars.Wait = this.Wait;
+    }
+
+    Wait(milliseconds) {
+        return new Promise(resolve => setTimeout(resolve, milliseconds));
     }
 
     Run() {

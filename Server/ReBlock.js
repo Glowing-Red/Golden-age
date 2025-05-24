@@ -4,6 +4,26 @@ global.ReBlock = new class ReBlock {
     #Vars = {};
 
     constructor() { }
+    
+    GenerateName(lengthBytes = 16) {
+        const Crypto = this.#Vars.Crypto;
+        const Blocks = this.#Blocks;
+
+        let blockName;
+        let taken = true;
+        
+        do {
+            const randomBytes = require("crypto").randomBytes(lengthBytes);
+            blockName = randomBytes.toString("hex").toLowerCase();
+            
+            if (!Blocks[blockName]) {
+                taken = false;
+            }
+
+        } while (taken);
+
+        return blockName;
+    }
 
     CreateBlock(blockName, blockClass) {
         if (this.#Started == true) {
@@ -51,18 +71,10 @@ global.ReBlock = new class ReBlock {
         return this.#Vars;
     }
 
-    #Wait(milliseconds) {
-        return new Promise(resolve => setTimeout(resolve, milliseconds));
-    }
-
-    async SequentialStart() {
-        if (this.#Started != false) {
-            throw new Error(`[Server] ReBlock lifecycle already started!`);
-        }
-
-        this.#Started = true;
+    #GetSortedBlocks() {
         const Blocks = this.#Blocks;
-        const sortedKeys = Object.keys(Blocks)
+
+        return Object.keys(Blocks)
             .filter((key) => Blocks[key].RejectCycle !== true)
             .sort((a, b) => {
                 const blockA = Blocks[a];
@@ -74,6 +86,16 @@ global.ReBlock = new class ReBlock {
 
                 return blockA.Order - blockB.Order;
             });
+    }
+
+    async SequentialStart() {
+        if (this.#Started != false) {
+            throw new Error(`[Server] ReBlock lifecycle already started!`);
+        }
+
+        this.#Started = true;
+        const Blocks = this.#Blocks;
+        const sortedKeys = this.#GetSortedBlocks();
 
         console.warn("[Server](Sequential) ReBlock: Started!");
 
@@ -117,19 +139,7 @@ global.ReBlock = new class ReBlock {
         const Promises = {}
 
         const Blocks = this.#Blocks;
-        const sortedKeys = Object.keys(Blocks)
-            .filter((key) => Blocks[key].RejectCycle !== true)
-            .sort((a, b) => {
-                const blockA = Blocks[a];
-                const blockB = Blocks[b];
-
-                if (blockB.Level !== blockA.Level) {
-                    return blockB.Level - blockA.Level;
-                }
-
-                return blockA.Order - blockB.Order;
-            }
-            );
+        const sortedKeys = this.#GetSortedBlocks();
 
         console.warn("[Server](Parallel) ReBlock: Started!");
 

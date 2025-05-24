@@ -1,7 +1,7 @@
 const ReBlock = global.ReBlock;
 const Vars = ReBlock.GetVariables();
 
-ReBlock.CreateBlock("Template", class Block_Utilities {
+ReBlock.CreateBlock(ReBlock.GenerateName(), class {
     #Block = undefined;
     #Level = 5;
     #Order = 2;
