@@ -95,12 +95,8 @@ ReBlock.CreateBlock("Database", class {
         await this.#SaveRoomTemplates();
     }
 
-    #GenerateHash256(buffer) {
-        return Vars.Crypto.createHash("sha256").update(buffer).digest("hex");
-    }
-
     async Start() {
-        const { MongoClient, GridFSBucket, Multer,  } = Vars;
+        const { MongoClient, GridFSBucket, Multer, } = Vars;
 
         const Storage = Multer.memoryStorage();
         Vars.Client = new MongoClient(this.#Uri);

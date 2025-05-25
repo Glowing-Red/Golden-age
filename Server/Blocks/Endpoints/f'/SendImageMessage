@@ -15,9 +15,16 @@ ReBlock.CreateBlock(ReBlock.GenerateName(), class {
         block.Order = this.#Order;
     }
 
+    GenerateHash256(buffer) {
+        return Vars.Crypto.createHash("sha256").update(buffer).digest("hex");
+    }
+
     async #PostEndpoint(req, res) {
+        const { Database, ObjectId, IO, Sharp } = Vars;
+        const sessionBlock = ReBlock.GetBlock("Session");
+
         const authToken = req.cookies.auth_token;
-        const credentials = await GetCredentials(authToken);
+        const credentials = await sessionBlock.GetActive(authToken);
 
         if (!credentials.Success) {
             return res.status(401).json({ success: false, message: credentials.Message || "Unauthorized: Ogiltig autentisering." });
@@ -34,7 +41,7 @@ ReBlock.CreateBlock(ReBlock.GenerateName(), class {
         }
 
         try {
-            const roomsCollection = db.collection("Rooms");
+            const roomsCollection = Database.collection("Rooms");
             const room = await roomsCollection.findOne({ _id: chatId });
 
             if (!room) {
@@ -45,10 +52,10 @@ ReBlock.CreateBlock(ReBlock.GenerateName(), class {
                 return res.status(403).json({ message: 'Du är inte medlem i detta chattrum och kan inte skicka meddelanden här.' });
             }
 
-            const originalFileHash = GenerateHash256(req.file.buffer);
+            const originalFileHash = this.GenerateHash256(req.file.buffer);
             console.log(`Mottog bild för meddelande: ${req.file.originalname}, Hash: ${originalFileHash}`);
 
-            const imageMetadataCollection = db.collection("ImageMetadata");
+            const imageMetadataCollection = Database.collection("ImageMetadata");
             const existingImageMetadata = await imageMetadataCollection.findOne({ originalFileHash: originalFileHash });
 
             if (existingImageMetadata) {
@@ -71,13 +78,13 @@ ReBlock.CreateBlock(ReBlock.GenerateName(), class {
                     { $push: { Messages: newMessage } }
                 );
 
-                io.to(chatId).emit('newMessage', { roomId: chatId, message: newMessage });
+                IO.to(chatId).emit('newMessage', { roomId: chatId, message: newMessage });
 
                 return res.status(200).json({ success: true, message: 'Bildmeddelande skickat framgångsrikt (återanvänd bild)!', sentMessage: newMessage });
             }
 
-            const optimizedBuffer = await sharp(req.file.buffer)
-                .resize({ width: 1200, fit: sharp.fit.inside, withoutEnlargement: true })
+            const optimizedBuffer = await Sharp(req.file.buffer)
+                .resize({ width: 1200, fit: Sharp.fit.inside, withoutEnlargement: true })
                 .webp({ quality: 80 })
                 .toBuffer();
 
@@ -127,7 +134,7 @@ ReBlock.CreateBlock(ReBlock.GenerateName(), class {
             );
 
             console.log(`Nytt bildmeddelande skickat i rum '${chatId}'.`);
-            io.to(chatId).emit('newMessage', { roomId: chatId, message: newMessage });
+            IO.to(chatId).emit('newMessage', { roomId: chatId, message: newMessage });
 
             res.status(200).json({ success: true, message: 'Bildmeddelande skickat framgångsrikt!', sentMessage: newMessage });
         } catch (error) {

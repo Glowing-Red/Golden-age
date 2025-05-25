@@ -487,7 +487,7 @@ async function GetCredentials(cookie) {
     if (!cookie) {
         return { Success: false, UserId: null };
     }
-
+    
     const collection = db.collection("Sessions");
     const data = await collection.findOne({ _id: cookie });
 
