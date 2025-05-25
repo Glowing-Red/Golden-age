@@ -145,7 +145,7 @@ ReBlock.CreateBlock(ReBlock.GenerateName(), class {
 
     Init() {
         const { App, Upload } = Vars;
-
+        
         App.get(`/api/${this.#Route}`, Upload.single("image"), this.#PostEndpoint);
     }
 });
