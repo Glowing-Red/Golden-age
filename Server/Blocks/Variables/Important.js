@@ -11,6 +11,7 @@ ReBlock.CreateBlock(ReBlock.GenerateName(), class {
     #LocalHost = false;
 
     #GetIPv4() {
+        const os = Vars.OperatingSystem;
         const interfaces = os.networkInterfaces();
         
         for (const interfaceName in interfaces) {
@@ -29,7 +30,6 @@ ReBlock.CreateBlock(ReBlock.GenerateName(), class {
     #SecretKey = `Rosalith"s Very Secret, Very Personal, Very Professional, Very Strong and very secure key in production.`;
     constructor(block) {
         this.#Block = block;
-        this.#IPv4 = this.#GetIPv4();
         
         block.Level = this.#Level;
         block.Order = this.#Order;
@@ -41,6 +41,7 @@ ReBlock.CreateBlock(ReBlock.GenerateName(), class {
     }
 
     SetupRequired() {
+        Vars.OperatingSystem = require("os");
         Vars.JsonWebToken = require("jsonwebtoken");
         Vars.Bcrypt = require("bcryptjs");
         Vars.Crypto = require("crypto");
@@ -107,7 +108,7 @@ ReBlock.CreateBlock(ReBlock.GenerateName(), class {
 
         this.UseApp();
 
-        const IPv4 = Vars.IPv4 = this.#IPv4;
+        const IPv4 = Vars.IPv4 = this.#GetIPv4();
         const PORT = Vars.PORT = (process.env.PORT || 3000);
         Vars.Domain = `http://${(this.#LocalHost == true ? "localhost" : IPv4)}:${PORT}`;
     }
