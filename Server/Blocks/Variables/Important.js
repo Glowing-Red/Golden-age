@@ -7,12 +7,29 @@ ReBlock.CreateBlock(ReBlock.GenerateName(), class {
     #Level = 100;
     #Order = 1;
 
-    #IPv4 = "192.168.50.28";
+    #IPv4 = "127.0.0.1";
     #LocalHost = false;
+
+    #GetIPv4() {
+        const interfaces = os.networkInterfaces();
+        
+        for (const interfaceName in interfaces) {
+            const networkInterface = interfaces[interfaceName];
+    
+            for (const alias of networkInterface) {
+                if (alias.family === "IPv4" && !alias.internal) {
+                    return alias.address;
+                }
+            }
+        }
+        
+        return this.#IPv4;
+    }
 
     #SecretKey = `Rosalith"s Very Secret, Very Personal, Very Professional, Very Strong and very secure key in production.`;
     constructor(block) {
         this.#Block = block;
+        this.#IPv4 = this.#GetIPv4();
         
         block.Level = this.#Level;
         block.Order = this.#Order;
