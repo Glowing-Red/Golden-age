@@ -116,7 +116,7 @@
                 const reader = new FileReader();
                 reader.onload = (e) => {
                     previewImage.src = e.target.result;
-                    previewImage.style.display = 'block';
+                    previewImage.style.display = 'none';
                 };
                 reader.readAsDataURL(file);
             } else {

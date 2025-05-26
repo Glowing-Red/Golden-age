@@ -135,7 +135,24 @@ app.use(cookieParser());
 app.use(express.static("public"));
 app.use(express.static(path.join(__dirname, "public")));
 
-const IPv4 = "192.168.50.28";
+const os = require('os');
+function GetIp() {
+    const interfaces = os.networkInterfaces();
+    
+    for (const interfaceName in interfaces) {
+        const networkInterface = interfaces[interfaceName];
+
+        for (const alias of networkInterface) {
+            if (alias.family === "IPv4" && !alias.internal) {
+                return alias.address;
+            }
+        }
+    }
+    
+    return "127.0.0.1";
+}
+
+const IPv4 = GetIp();
 const PORT = process.env.PORT || 3000;
 const local = false;
 const domain = `http://${(local == true ? "localhost" : IPv4)}:${PORT}`;
@@ -287,7 +304,7 @@ app.get('/image/:roomId/:gridFSId', async (req, res) => {
                 }
             }
         });
-
+        
         if (!room) {
             const roomExists = await roomsCollection.findOne({ _id: roomId });
 
