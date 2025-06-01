@@ -18,7 +18,7 @@ ReBlock.CreateBlock(ReBlock.GenerateName(), class {
     GenerateHash256(buffer) {
         return Vars.Crypto.createHash("sha256").update(buffer).digest("hex");
     }
-
+    
     async #PostEndpoint(req, res) {
         const { Database, ObjectId, IO, Sharp } = Vars;
         const sessionBlock = ReBlock.GetBlock("Session");
@@ -27,17 +27,17 @@ ReBlock.CreateBlock(ReBlock.GenerateName(), class {
         const credentials = await sessionBlock.GetActive(authToken);
 
         if (!credentials.Success) {
-            return res.status(401).json({ success: false, message: credentials.Message || "Unauthorized: Ogiltig autentisering." });
+            return res.status(401).json({ success: false, message: credentials.Message || "Unauthorized" });
         }
-
+        
         const senderId = credentials.UserId;
         const { chatId, caption } = req.body;
 
         if (!req.file) {
-            return res.status(400).json({ message: 'Ingen bildfil laddades upp för meddelandet.' });
+            return res.status(400).json({ message: 'No image uploaded' });
         }
         if (!chatId) {
-            return res.status(400).json({ message: 'Chatt-ID saknas för bildmeddelandet.' });
+            return res.status(400).json({ message: 'No Target Room' });
         }
 
         try {
@@ -45,7 +45,7 @@ ReBlock.CreateBlock(ReBlock.GenerateName(), class {
             const room = await roomsCollection.findOne({ _id: chatId });
 
             if (!room) {
-                return res.status(404).json({ message: `Chattrummet med ID '${chatId}' hittades inte.` });
+                return res.status(404).json({ message: `Chat Room '${chatId}' not found.` });
             }
 
             if (!room.Members.includes(senderId)) {
